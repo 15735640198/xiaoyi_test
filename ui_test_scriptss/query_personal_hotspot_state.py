@@ -7,6 +7,12 @@ HarmonyOS 个人热点开关状态查询脚本
 原理: 通过 uitest dumpLayout 获取控件树 JSON，解析 Toggle 组件的 checked 属性
 
 依赖: hdc 已安装并在 PATH 中，设备已通过 USB/WiFi 连接
+
+hdc 安装方式:
+  1. 下载安装 DevEco Studio: https://developer.huawei.com/consumer/cn/download/
+  2. 将 hdc 所在目录加入 PATH:
+     <DevEco Studio>/sdk/<版本>/openharmony/toolchains/
+  3. 验证: hdc version
 """
 
 import subprocess
@@ -18,14 +24,66 @@ import time
 import tempfile
 
 # ── 配置 ──────────────────────────────────────────────
-SETTINGS_BUNDLE = 'com.huawei.hmossettings'
-SETTINGS_ABILITY = 'EntryAbility'
+# 设置应用的候选包名/Ability 名（按优先级排列，脚本会依次尝试）
+SETTINGS_CANDIDATES = [
+    # (bundleName, moduleName, abilityName)
+    ('com.huawei.hmossettings', 'entry', 'EntryAbility'),
+    ('com.huawei.hmossettings', None,    'EntryAbility'),   # 不带 -m 参数
+    ('com.huawei.hmossettings', 'entry', 'MainAbility'),
+    ('com.huawei.hmossettings', None,    'MainAbility'),
+    ('com.android.settings',    None,    'Settings'),
+    ('com.android.settings',    None,    'MainSettings'),
+]
+
 TEXT_MOBILE_NETWORK = '移动网络'
 TEXT_PERSONAL_HOTSPOT = '个人热点'
 REMOTE_LAYOUT_PATH = '/data/local/tmp/layout.json'
 NAV_WAIT = 2.5          # 页面跳转后等待秒数
 DUMP_WAIT = 1.0         # dumpLayout 后等待秒数
+
+# hdc 常见安装路径（未在 PATH 中找到时自动搜索）
+HDC_COMMON_PATHS = [
+    # DevEco Studio SDK 默认位置
+    os.path.expandvars(r'%LOCALAPPDATA%\Huawei\DevEcoStudio\sdk'),
+    os.path.expandvars(r'%USERPROFILE%\AppData\Local\Huawei\DevEcoStudio\sdk'),
+    os.path.expandvars(r'%USERPROFILE%\AppData\Roaming\Huawei\DevEcoStudio\sdk'),
+    r'C:\Program Files\Huawei\DevEco Studio\sdk',
+    r'D:\DevEco Studio\sdk',
+    # macOS / Linux
+    os.path.expandvars(r'$HOME/Library/Huawei/DevEcoStudio/sdk'),
+    os.path.expandvars(r'$HOME/Huawei/DevEcoStudio/sdk'),
+    # HarmonyOS SDK (standalone)
+    os.path.expandvars(r'%USERPROFILE%\Huawei\HarmonyOS_SDK'),
+]
 # ─────────────────────────────────────────────────────
+
+
+def find_hdc() -> str:
+    """查找 hdc 可执行文件路径，返回 'hdc' 或完整路径，找不到则返回 None"""
+    # 先检查 PATH 中是否有
+    try:
+        r = subprocess.run(['hdc', 'version'],
+                           capture_output=True, text=True, timeout=5)
+        if 'Ver:' in r.stdout or 'Ver: ' in r.stdout:
+            return 'hdc'
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # 在已知 SDK 路径中搜索
+    for sdk_dir in HDC_COMMON_PATHS:
+        if not os.path.isdir(sdk_dir):
+            continue
+        for root, dirs, files in os.walk(sdk_dir):
+            if 'hdc.exe' in files or 'hdc' in files:
+                # 优先选择 toolchains 目录下的
+                hdc_path = os.path.join(root, 'hdc' if 'hdc' in files else 'hdc.exe')
+                print(f"  [INFO] 自动找到 hdc: {hdc_path}")
+                return hdc_path
+            # 限制搜索深度
+            depth = root.replace(sdk_dir, '').count(os.sep)
+            if depth > 4:
+                dirs.clear()
+    return None
 
 
 def run_cmd(cmd: list, timeout: int = 30) -> str:
@@ -46,7 +104,8 @@ def run_cmd(cmd: list, timeout: int = 30) -> str:
 
 def hdc_shell(*args, timeout: int = 30) -> str:
     """执行 hdc shell 命令"""
-    return run_cmd(['hdc', 'shell', *list(args)], timeout)
+    global _HDC
+    return run_cmd([_HDC, 'shell', *list(args)], timeout)
 
 
 def dump_layout() -> dict:
@@ -54,7 +113,6 @@ def dump_layout() -> dict:
     获取当前页面控件树
     优先尝试解析 stdout，失败则从设备拉取 layout.json 文件
     """
-    # 执行 dumpLayout
     output = hdc_shell('uitest', 'dumpLayout')
     time.sleep(DUMP_WAIT)
 
@@ -68,7 +126,7 @@ def dump_layout() -> dict:
 
     # 回退: 从设备拉取文件
     local_path = os.path.join(tempfile.gettempdir(), 'hm_layout.json')
-    run_cmd(['hdc', 'file', 'recv', REMOTE_LAYOUT_PATH, local_path], timeout=15)
+    run_cmd([_HDC, 'file', 'recv', REMOTE_LAYOUT_PATH, local_path], timeout=15)
 
     if not os.path.exists(local_path):
         raise RuntimeError("无法获取布局文件: dumpLayout 失败且文件拉取失败")
@@ -80,7 +138,6 @@ def dump_layout() -> dict:
 def parse_bounds(bounds) -> tuple:
     """解析 bounds 字段，返回中心坐标 (x, y)"""
     if isinstance(bounds, str):
-        # 格式: "[left,top][right,bottom]"
         nums = re.findall(r'\d+', bounds)
         if len(nums) >= 4:
             return ((int(nums[0]) + int(nums[2])) // 2,
@@ -164,9 +221,10 @@ def click_by_text(layout: dict, text: str, wait: float = NAV_WAIT) -> bool:
     if not comps:
         print(f"  -> 未找到文本 '{text}'")
         return False
-    # 优先选择可点击的组件 (有 onClick 或类型为 Text/Button)
+    # 优先选择可点击的组件
+    clickable_types = ('Text', 'TextComponent', 'Button', 'Row', 'ListItem', 'RowListItem')
     clickable = [c for c in comps if c.get('clickable', False) or
-                 c.get('type', '') in ('Text', 'Button', 'Row', 'ListItem')]
+                 c.get('type', '') in clickable_types]
     target = clickable[0] if clickable else comps[0]
     print(f"  -> 找到 '{text}' (共 {len(comps)} 个匹配)")
     return click_component(target, wait)
@@ -175,10 +233,6 @@ def click_by_text(layout: dict, text: str, wait: float = NAV_WAIT) -> bool:
 def get_toggle_state(layout: dict, target_text: str) -> str:
     """
     查找目标开关状态
-    策略1: Toggle 自身包含目标文本
-    策略2: 离目标文本最近的 Toggle
-    策略3: 带 checked/isOn 属性且靠近目标文本的组件
-    策略4: 只有一个 Toggle 时直接返回
     返回: 'on' | 'off' | 'unknown' | None
     """
     toggles = find_toggles(layout)
@@ -199,14 +253,13 @@ def get_toggle_state(layout: dict, target_text: str) -> str:
             )
             return _check_state(nearest)
 
-    # 策略3: 带 checked/isOn 属性的组件中查找
+    # 策略3: 带 checked/isOn 属性且靠近目标文本的组件
     checked_comps = find_components(
         layout, lambda c: 'checked' in c or 'isOn' in c
     )
     for c in checked_comps:
         if target_text in get_text(c):
             return _check_state(c)
-        # 检查是否靠近目标文本
         for tc in text_comps:
             if _distance(parse_bounds(tc.get('bounds')),
                          parse_bounds(c.get('bounds'))) < 500:
@@ -235,38 +288,93 @@ def debug_dump(layout: dict):
               f"checked={c.get('checked', 'N/A')} bounds={c.get('bounds')}")
 
 
+def start_settings():
+    """
+    启动设置应用
+    依次尝试候选包名/Ability，首个成功即停止
+    """
+    for idx, (bundle, mod, ability) in enumerate(SETTINGS_CANDIDATES):
+        args = ['aa', 'start', '-n', bundle]
+        if mod:
+            args += ['-m', mod]
+        args.append(ability)
+
+        print(f"  -> 尝试 #{idx+1}: aa start -n {bundle}"
+              + (f" -m {mod}" if mod else "") + f" {ability}")
+        output = hdc_shell(*args, timeout=10)
+
+        # aa start 失败时输出类似 "failed" 或 "error"
+        if 'fail' in output.lower() or 'error' in output.lower():
+            print(f"    失败: {output.strip()[:120]}")
+            continue
+        print(f"    成功")
+        return True
+
+    return False
+
+
 def main():
+    global _HDC
+
     print("=" * 55)
     print("  HarmonyOS 个人热点开关状态查询")
     print("  路径: 设置 > 移动网络 > 个人热点")
     print("=" * 55)
 
-    # 检查 hdc
-    ver = run_cmd(['hdc', 'version'], timeout=10)
-    if 'hdc' not in ver.lower() and '1.' not in ver:
-        print("[ERROR] hdc 未安装或不在 PATH 中")
+    # 查找 hdc
+    _HDC = find_hdc()
+    if not _HDC:
+        print("\n[ERROR] 未找到 hdc 工具！")
+        print("")
+        print("hdc 是 DevEco Studio 自带的设备调试工具，安装步骤:")
+        print("  1. 下载 DevEco Studio:")
+        print("     https://developer.huawei.com/consumer/cn/download/")
+        print("  2. 安装后，hdc 位于:")
+        print("     <DevEco Studio>/sdk/<版本>/openharmony/toolchains/hdc.exe")
+        print("  3. 将上述路径加入系统环境变量 PATH")
+        print("  4. 重新打开终端，运行 hdc version 验证")
+        print("")
+        print("如果已安装但脚本未找到，请在脚本顶部 HDC_COMMON_PATHS 中添加实际路径")
         sys.exit(1)
-    print(f"  hdc 可用: {ver.strip().splitlines()[0] if ver else 'OK'}")
+
+    print(f"  hdc: {_HDC}")
+
+    # 验证 hdc 可用
+    ver = run_cmd([_HDC, 'version'], timeout=10)
+    for line in ver.splitlines():
+        if 'Ver:' in line:
+            print(f"  hdc 版本: {line.strip()}")
+            break
 
     # 检查设备连接
-    list_output = run_cmd(['hdc', 'list', 'targets'], timeout=10)
+    list_output = run_cmd([_HDC, 'list', 'targets'], timeout=10)
     devices = [d.strip() for d in list_output.strip().splitlines()
                if d.strip() and 'Empty' not in d]
     if not devices:
-        print("[ERROR] 未检测到已连接的设备，请先连接设备")
+        print("[ERROR] 未检测到已连接的设备，请先通过 USB/WiFi 连接设备")
+        print("  USB:  连接数据线 > 设备开启「USB 调试」> hdc list targets")
+        print("  WiFi: hdc tconn <设备IP>:8710")
         sys.exit(1)
-    print(f"  已连接设备: {devices[0]}")
+    print(f"  已连接: {devices[0]}")
 
     # Step 1: 启动设置应用
     print("\n[1/4] 启动设置应用...")
-    hdc_shell('aa', 'start', '-a', SETTINGS_ABILITY, '-b', SETTINGS_BUNDLE)
+    if not start_settings():
+        print("\n[FAIL] 所有候选包名均启动失败！")
+        print("请手动在设备上打开「设置」应用，然后重新运行脚本")
+        print("或者通过以下命令确认正确的设置应用包名:")
+        print(f"  {_HDC} shell bm dump -a | grep -i settings")
+        print("然后将正确的包名/Ability名加到 SETTINGS_CANDIDATES 中")
+        return
     time.sleep(3)
 
     # Step 2: 进入移动网络
     print("\n[2/4] 导航到「移动网络」...")
     layout = dump_layout()
     if not click_by_text(layout, TEXT_MOBILE_NETWORK):
-        print("[FAIL] 未找到「移动网络」入口")
+        print("\n[FAIL] 未找到「移动网络」入口")
+        print("可能原因: 系统语言非中文、设置页面结构不同")
+        print("建议: 修改脚本 TEXT_MOBILE_NETWORK 为对应语言的文本")
         debug_dump(layout)
         return
 
@@ -274,7 +382,9 @@ def main():
     print("\n[3/4] 导航到「个人热点」...")
     layout = dump_layout()
     if not click_by_text(layout, TEXT_PERSONAL_HOTSPOT):
-        print("[FAIL] 未找到「个人热点」入口")
+        print("\n[FAIL] 未找到「个人热点」入口")
+        print("可能原因: 系统语言非中文、设置页面结构不同")
+        print("建议: 修改脚本 TEXT_PERSONAL_HOTSPOT 为对应语言的文本")
         debug_dump(layout)
         return
 

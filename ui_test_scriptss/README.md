@@ -6,19 +6,33 @@
 
 ### 1. 安装 hdc 工具
 
-`hdc`（HarmonyOS Device Connector）随 HarmonyOS SDK 附带，安装 DevEco Studio 后自动可用。
+`hdc`（HarmonyOS Device Connector）随 **DevEco Studio** 或 **HarmonyOS SDK** 附带。
 
-确认安装：
+#### 方式一：安装 DevEco Studio（推荐）
+
+1. 访问 [华为开发者下载中心](https://developer.huawei.com/consumer/cn/download/) 下载 DevEco Studio
+2. 安装完成后，hdc 位于：
+   ```
+   <DevEco Studio 安装目录>\sdk\<版本号>\openharmony\toolchains\hdc.exe
+   ```
+   示例：`D:\DevEco Studio\sdk\4.1.0.600\openharmony\toolchains\hdc.exe`
+
+#### 方式二：仅安装 HarmonyOS SDK 命令行工具
+
+如果不想装完整 IDE，可以在 DevEco Studio 下载页选择「Command Line Tools」单独安装 SDK。
+
+#### 配置 PATH
+
+将 hdc 所在目录加入系统环境变量 PATH，然后新开终端验证：
 
 ```bash
 hdc version
+# 输出: Ver: 2.0.0a
 ```
 
-如果提示找不到命令，需将 hdc 添加到系统 PATH。默认路径通常为：
+> **注意**：配置 PATH 后必须**重新打开终端窗口**才能生效。
 
-```
-<DevEco Studio 安装目录>\sdk\<版本>\openharmony\toolchains\hdc.exe
-```
+如果未配置 PATH，也可以临时使用——每次运行脚本时指定 hdc 路径，脚本会自动搜索常见的 SDK 安装路径。
 
 ### 2. 连接 HarmonyOS 设备
 
@@ -123,23 +137,31 @@ python query_personal_hotspot_state.py
 脚本顶部的配置区：
 
 ```python
-SETTINGS_BUNDLE = 'com.huawei.hmossettings'   # 设置应用包名
-SETTINGS_ABILITY = 'EntryAbility'              # 设置应用 Ability 名
-TEXT_MOBILE_NETWORK = '移动网络'               # 移动网络入口文本
-TEXT_PERSONAL_HOTSPOT = '个人热点'             # 个人热点入口文本
-NAV_WAIT = 2.5                                 # 页面跳转等待秒数
-DUMP_WAIT = 1.0                                # dumpLayout 后等待秒数
+# 设置应用候选包名（会依次尝试）
+SETTINGS_CANDIDATES = [
+    ('com.huawei.hmossettings', 'entry', 'EntryAbility'),
+    ('com.huawei.hmossettings', None,    'EntryAbility'),
+    ('com.huawei.hmossettings', 'entry', 'MainAbility'),
+    ('com.huawei.hmossettings', None,    'MainAbility'),
+    ('com.android.settings',    None,    'Settings'),
+]
+
+TEXT_MOBILE_NETWORK = '移动网络'    # 移动网络入口文本
+TEXT_PERSONAL_HOTSPOT = '个人热点'  # 个人热点入口文本
+NAV_WAIT = 2.5                     # 页面跳转等待秒数
+DUMP_WAIT = 1.0                    # dumpLayout 后等待秒数
 ```
 
 ### 需要调整的常见情况
 
 | 情况 | 修改方式 |
 |------|----------|
-| 设置应用包名不同 | 修改 `SETTINGS_BUNDLE`，可用 `hdc shell bm dump -n com.huawei.hmossettings` 确认 |
-| Ability 名不同 | 修改 `SETTINGS_ABILITY`，常见值有 `MainAbility`、`SettingsAbility` |
+| 设置应用包名不同 | 将正确包名加入 `SETTINGS_CANDIDATES` 列表，可用以下命令确认：`hdc shell bm dump -a \| grep -i settings` |
+| Ability 名不同 | 同样加入候选列表，常见值: `EntryAbility`、`MainAbility` |
 | 设备性能较慢，页面加载慢 | 增大 `NAV_WAIT`（如改为 4.0） |
 | dumpLayout 响应慢 | 增大 `DUMP_WAIT`（如改为 2.0） |
 | 系统语言为英文 | 改为 `TEXT_MOBILE_NETWORK = 'Mobile network'`、`TEXT_PERSONAL_HOTSPOT = 'Personal hotspot'` |
+| 脚本未找到 hdc | 在 `HDC_COMMON_PATHS` 中添加实际 SDK 安装路径 |
 
 ## 工作原理
 
@@ -174,9 +196,51 @@ DUMP_WAIT = 1.0                                # dumpLayout 后等待秒数
 
 ## 常见问题
 
-### Q: 提示 "hdc 未安装或不在 PATH 中"
+### Q: 提示 "未找到 hdc 工具"
 
-将 hdc 所在目录加入系统环境变量 PATH，或使用完整路径调用。
+**原因**：hdc 不在 PATH 中，且默认安装路径搜索也未找到。
+
+**解决**：
+1. 确认已安装 DevEco Studio（[下载地址](https://developer.huawei.com/consumer/cn/download/)）
+2. 找到 SDK 安装目录，例如 `D:\DevEco Studio\sdk\4.1.0.600\openharmony\toolchains\`
+3. 将 toolchains 目录添加到系统环境变量 PATH
+4. **必须重新打开终端**，然后运行 `hdc version` 验证
+5. 如果仍不行，在脚本 `HDC_COMMON_PATHS` 列表中手动添加实际路径
+
+### Q: 启动设置应用失败，所有候选包名均尝试失败
+
+`aa start` 命令语法格式为：
+```
+hdc shell aa start -n <bundleName> [-m <moduleName>] <abilityName>
+```
+
+- `-n`：指定应用包名（此前脚本误写为 `-b`，已修正）
+- `-m`：指定 module 名（可选，通常为 `entry`）
+- 最后一个参数是 Ability 名（不带前缀标志）
+
+**排查步骤**：
+1. 手动执行确认设上的包名：
+   ```bash
+   hdc shell bm dump -a | grep -i "settings\|设置"
+   ```
+2. 将匹配到的包名/Module/Ability 加入 `SETTINGS_CANDIDATES`
+3. 手动测试启动命令：
+   ```bash
+   hdc shell aa start -n <包名> [-m <module名>] <Ability名>
+   ```
+
+### Q: 还是不行，不想折腾启动命令
+
+**绕过方案**：先手动在设备上打开「设置」应用并导航到个人热点页面，然后修改脚本跳过 Step 1-3，直接从 Step 4 开始：
+
+```python
+# 在 main() 函数中注释掉启动设置和导航的代码：
+# Step 1, 2, 3 全部注释掉...
+# 直接从 Step 4 开始:
+print("\n[4/4] 查询个人热点开关状态...")
+layout = dump_layout()
+# ...
+```
 
 ### Q: 提示 "未检测到已连接的设备"
 
