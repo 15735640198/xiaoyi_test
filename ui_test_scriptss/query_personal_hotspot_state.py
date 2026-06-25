@@ -25,14 +25,14 @@ import tempfile
 
 # ── 配置 ──────────────────────────────────────────────
 # 设置应用的候选包名/Ability 名（按优先级排列，脚本会依次尝试）
+# aa start 语法: aa start -a <abilityName> -b <bundleName> [-m <moduleName>]
 SETTINGS_CANDIDATES = [
     # (bundleName, moduleName, abilityName)
-    ('com.huawei.hmossettings', 'entry', 'EntryAbility'),
-    ('com.huawei.hmossettings', None,    'EntryAbility'),   # 不带 -m 参数
-    ('com.huawei.hmossettings', 'entry', 'MainAbility'),
-    ('com.huawei.hmossettings', None,    'MainAbility'),
-    ('com.android.settings',    None,    'Settings'),
-    ('com.android.settings',    None,    'MainSettings'),
+    ('com.huawei.hmos.settings', None, 'com.huawei.hmos.settings.MainAbility'),
+    ('com.huawei.hmos.settings', 'phone_settings', 'com.huawei.hmos.settings.MainAbility'),
+    ('com.huawei.hmossettings',  None, 'EntryAbility'),
+    ('com.huawei.hmossettings',  None, 'MainAbility'),
+    ('com.android.settings',     None, 'Settings'),
 ]
 
 TEXT_MOBILE_NETWORK = '移动网络'
@@ -49,6 +49,8 @@ HDC_COMMON_PATHS = [
     os.path.expandvars(r'%USERPROFILE%\AppData\Roaming\Huawei\DevEcoStudio\sdk'),
     r'C:\Program Files\Huawei\DevEco Studio\sdk',
     r'D:\DevEco Studio\sdk',
+    # 用户自定义安装的 DevEco Studio
+    r'D:\lzs\devecostudio-windows-6.1.1.280\DevEco Studio\sdk',
     # macOS / Linux
     os.path.expandvars(r'$HOME/Library/Huawei/DevEcoStudio/sdk'),
     os.path.expandvars(r'$HOME/Huawei/DevEcoStudio/sdk'),
@@ -111,25 +113,27 @@ def hdc_shell(*args, timeout: int = 30) -> str:
 def dump_layout() -> dict:
     """
     获取当前页面控件树
-    优先尝试解析 stdout，失败则从设备拉取 layout.json 文件
+    uitest dumpLayout 输出格式: "DumpLayout saved to:/data/local/tmp/layout_<timestamp>.json"
+    从中解析实际文件路径，再 hdc file recv 拉取
     """
     output = hdc_shell('uitest', 'dumpLayout')
     time.sleep(DUMP_WAIT)
 
-    # 优先: stdout 直接输出 JSON
-    stripped = output.strip()
-    if stripped.startswith('{') or stripped.startswith('['):
-        try:
-            return json.loads(stripped)
-        except json.JSONDecodeError:
-            pass
+    # 从 stdout 解析文件路径: "DumpLayout saved to:/data/local/tmp/layout_xxx.json"
+    remote_path = None
+    m = re.search(r'saved to:\s*(/\S+\.json)', output)
+    if m:
+        remote_path = m.group(1)
+    else:
+        # 回退到默认路径
+        remote_path = REMOTE_LAYOUT_PATH
 
-    # 回退: 从设备拉取文件
+    # 从设备拉取文件
     local_path = os.path.join(tempfile.gettempdir(), 'hm_layout.json')
-    run_cmd([_HDC, 'file', 'recv', REMOTE_LAYOUT_PATH, local_path], timeout=15)
+    run_cmd([_HDC, 'file', 'recv', remote_path, local_path], timeout=15)
 
     if not os.path.exists(local_path):
-        raise RuntimeError("无法获取布局文件: dumpLayout 失败且文件拉取失败")
+        raise RuntimeError(f"无法获取布局文件: dumpLayout 失败 (尝试拉取 {remote_path})")
 
     with open(local_path, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -168,9 +172,18 @@ def find_components(node, predicate, results=None) -> list:
     return results
 
 
+def attr(comp: dict, key: str, default=''):
+    """从组件的 attributes 字典中读取属性（dumpLayout 的属性嵌套在 attributes 里）"""
+    a = comp.get('attributes')
+    if a is None:
+        # 兼容: 属性直接在顶层
+        return comp.get(key, default)
+    return a.get(key, default)
+
+
 def get_text(comp: dict) -> str:
-    """获取组件文本 (text 或 accessibilityText)"""
-    return comp.get('text', '') or comp.get('accessibilityText', '') or ''
+    """获取组件文本 (text 或 description/accessibilityText)"""
+    return attr(comp, 'text', '') or attr(comp, 'description', '') or ''
 
 
 def find_by_text(node, text: str) -> list:
@@ -182,13 +195,15 @@ def find_toggles(node) -> list:
     """查找所有 Toggle/Switch 类型组件"""
     return find_components(
         node,
-        lambda c: c.get('type', '').lower() in ('toggle', 'switch', 'toggleswitch')
+        lambda c: attr(c, 'type', '').lower() in ('toggle', 'switch', 'toggleswitch')
     )
 
 
 def _check_state(comp: dict) -> str:
     """从组件属性判断开关状态 -> 'on' | 'off' | 'unknown'"""
-    val = comp.get('checked', comp.get('isOn', None))
+    val = attr(comp, 'checked', None)
+    if val is None:
+        val = attr(comp, 'isOn', None)
     if val is True or val in ('true', 'True', 1, '1'):
         return 'on'
     if val is False or val in ('false', 'False', 0, '0'):
@@ -204,9 +219,9 @@ def _distance(p1, p2) -> float:
 
 def click_component(comp: dict, wait: float = NAV_WAIT) -> bool:
     """点击指定组件"""
-    center = parse_bounds(comp.get('bounds'))
+    center = parse_bounds(attr(comp, 'bounds'))
     if not center:
-        print(f"  -> 无法获取组件坐标: bounds={comp.get('bounds')}")
+        print(f"  -> 无法获取组件坐标: bounds={attr(comp, 'bounds')}")
         return False
     x, y = center
     print(f"  -> 点击坐标 ({x}, {y})")
@@ -223,8 +238,8 @@ def click_by_text(layout: dict, text: str, wait: float = NAV_WAIT) -> bool:
         return False
     # 优先选择可点击的组件
     clickable_types = ('Text', 'TextComponent', 'Button', 'Row', 'ListItem', 'RowListItem')
-    clickable = [c for c in comps if c.get('clickable', False) or
-                 c.get('type', '') in clickable_types]
+    clickable = [c for c in comps if attr(c, 'clickable') == 'true' or
+                 attr(c, 'type', '') in clickable_types]
     target = clickable[0] if clickable else comps[0]
     print(f"  -> 找到 '{text}' (共 {len(comps)} 个匹配)")
     return click_component(target, wait)
@@ -245,24 +260,24 @@ def get_toggle_state(layout: dict, target_text: str) -> str:
 
     # 策略2: 离目标文本最近的 Toggle
     if text_comps and toggles:
-        text_center = parse_bounds(text_comps[0].get('bounds'))
+        text_center = parse_bounds(attr(text_comps[0], 'bounds'))
         if text_center:
             nearest = min(
                 toggles,
-                key=lambda t: _distance(text_center, parse_bounds(t.get('bounds')))
+                key=lambda t: _distance(text_center, parse_bounds(attr(t, 'bounds')))
             )
             return _check_state(nearest)
 
     # 策略3: 带 checked/isOn 属性且靠近目标文本的组件
     checked_comps = find_components(
-        layout, lambda c: 'checked' in c or 'isOn' in c
+        layout, lambda c: attr(c, 'checked', '') != '' or attr(c, 'isOn', '') != ''
     )
     for c in checked_comps:
         if target_text in get_text(c):
             return _check_state(c)
         for tc in text_comps:
-            if _distance(parse_bounds(tc.get('bounds')),
-                         parse_bounds(c.get('bounds'))) < 500:
+            if _distance(parse_bounds(attr(tc, 'bounds')),
+                         parse_bounds(attr(c, 'bounds'))) < 500:
                 return _check_state(c)
 
     # 策略4: 只有一个 Toggle，直接返回
@@ -277,33 +292,31 @@ def debug_dump(layout: dict):
     toggles = find_toggles(layout)
     print(f"\n  [DEBUG] 找到 {len(toggles)} 个 Toggle/Switch:")
     for i, t in enumerate(toggles):
-        print(f"    [{i}] type={t.get('type')} text={get_text(t)!r} "
-              f"checked={t.get('checked', 'N/A')} isOn={t.get('isOn', 'N/A')} "
-              f"bounds={t.get('bounds')}")
+        print(f"    [{i}] type={attr(t,'type')} text={get_text(t)!r} "
+              f"checked={attr(t,'checked','N/A')} bounds={attr(t,'bounds')}")
 
     hotspot_comps = find_by_text(layout, '热点')
     print(f"\n  [DEBUG] 找到 {len(hotspot_comps)} 个包含'热点'的组件:")
     for i, c in enumerate(hotspot_comps[:10]):
-        print(f"    [{i}] type={c.get('type')} text={get_text(c)!r} "
-              f"checked={c.get('checked', 'N/A')} bounds={c.get('bounds')}")
+        print(f"    [{i}] type={attr(c,'type')} text={get_text(c)!r} "
+              f"checked={attr(c,'checked','N/A')} bounds={attr(c,'bounds')}")
 
 
 def start_settings():
     """
     启动设置应用
     依次尝试候选包名/Ability，首个成功即停止
+    aa start 语法: aa start -a <abilityName> -b <bundleName> [-m <moduleName>]
     """
     for idx, (bundle, mod, ability) in enumerate(SETTINGS_CANDIDATES):
-        args = ['aa', 'start', '-n', bundle]
+        args = ['aa', 'start', '-a', ability, '-b', bundle]
         if mod:
             args += ['-m', mod]
-        args.append(ability)
 
-        print(f"  -> 尝试 #{idx+1}: aa start -n {bundle}"
-              + (f" -m {mod}" if mod else "") + f" {ability}")
+        cmd_str = f"aa start -a {ability} -b {bundle}" + (f" -m {mod}" if mod else "")
+        print(f"  -> 尝试 #{idx+1}: {cmd_str}")
         output = hdc_shell(*args, timeout=10)
 
-        # aa start 失败时输出类似 "failed" 或 "error"
         if 'fail' in output.lower() or 'error' in output.lower():
             print(f"    失败: {output.strip()[:120]}")
             continue
