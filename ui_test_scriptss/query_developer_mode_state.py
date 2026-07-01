@@ -8,6 +8,8 @@ API: settings_api.query_developer_mode
   python query_developer_mode_state.py
 """
 
+import sys
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 from hdc_utils import find_hdc, check_device
 from settings_api import query_developer_mode
 

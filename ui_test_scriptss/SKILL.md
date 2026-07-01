@@ -73,9 +73,17 @@ def set_zoom_gesture(desired):
 | 省电模式 | `query_power_saving()` | `set_power_saving('on'/'off')` |
 | 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
 | WLAN | `query_wlan()` | `set_wlan('on'/'off')` |
+| 星闪 | `query_nearlink()` | — |
 | 蓝牙开关 | `query_bluetooth()` | — |
 | 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
 | 屏幕亮度 | `query_brightness()` | — |
+| 朗读速度 | `query_speech_rate()` | `set_speech_rate(value)` |
+| 锁屏方式 | `query_lock_screen_method()` | —（安全验证，不可自动化） |
+| 来电铃声 | `query_ringtone()` | `set_ringtone_default()` |
+| 热点配置 | `query_hotspot_config()` | `set_hotspot_name(name)` / `set_hotspot_password(pwd)` |
+| 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
+| 电子书模式 | `query_ebook_mode()` | — |
+| 系统导航模式 | `query_navigation_mode()` | — |
 
 ### 第 4 步：生成 CLI 脚本（薄壳）
 
@@ -129,7 +137,7 @@ if __name__ == '__main__':
 1. **Slider 的值在 `text`/`originalText` 属性中，不是 `value`**
 2. **选择器选项是 `MenuItem` 类型，不是 `Text`**
 3. **Text 组件通常 `clickable=false`** — 要点击父级 Row
-4. **`find_by_text` 是子串匹配** — 用 `find_button()` 加长度过滤
+4. **`find_by_text` 是子串匹配** — 目标文本若是页面标题子串（如 `星闪` ← `星闪和蓝牙`），会碰撞命中标题导致 `unknown`。所有 `read_status_*`/`_toggle_*`/`click_by_text` 已改用 `find_by_text_nearest()` 按文本长度差排序规避。新增设置项时检查目标文本是否是入口文本的子串
 5. **toggle_row 和 button_card 操作不会触发弹窗**
 6. **text_value 开关需要 3 步**：列表页 → 点击项 → 子页面 Toggle → 返回 → 验证
 7. **导航前先 force-stop** — 使用 `restart_settings()`
@@ -145,14 +153,21 @@ if __name__ == '__main__':
 
 ```
 ui_test_scriptss/
-├── hdc_utils.py              底层工具 (473行)
-├── settings_api.py           业务 API (400行)
+├── hdc_utils.py              底层工具 (581行)
+├── settings_api.py           业务 API (782行)
 ├── template.py               CLI 模板 (62行)
 ├── query_zoom_gesture_state.py     41行
+├── query_nearlink_state.py         41行
 ├── query_personal_hotspot_state.py 37行
 ├── query_developer_mode_state.py   36行
 ├── dnd_manager.py                  48行
 ├── bluetooth_manager.py            64行
-├── HarmonyOS设置功能知识库.md       知识库 v5 (15章, 1468行)
+├── speech_rate_manager.py          52行
+├── lockscreen_method_manager.py    77行
+├── ringtone_manager.py             70行
+├── hotspot_config_manager.py       75行
+├── auto_brightness_manager.py      50行
+├── query_multi_status.py           综合查询 (省电/亮度/电子书/导航)
+├── HarmonyOS设置功能知识库.md       知识库 v5 (15章, 1527行)
 └── SKILL.md                        本文件
 ```

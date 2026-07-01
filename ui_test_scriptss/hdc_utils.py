@@ -147,6 +147,16 @@ def find_by_text(node, text):
     return find_components(node, lambda c: text in get_text(c))
 
 
+def find_by_text_nearest(node, text):
+    """
+    子串匹配查找文本组件，按文本长度差升序排序（最接近的优先）。
+    避免 find_by_text 的子串碰撞: 搜索 '星闪' 时，
+    '星闪' 标签(2字) 排在 '星闪和蓝牙' 标题(5字) 前面。
+    """
+    comps = find_by_text(node, text)
+    return sorted(comps, key=lambda c: abs(len(get_text(c).strip()) - len(text)))
+
+
 def find_button(node, text):
     """
     查找按钮: 子串匹配但排除含'设备'的长文本
@@ -219,7 +229,7 @@ def click_by_text(layout, text, wait=NAV_WAIT):
     点击文本组件 — 自动找可点击父级
     Text 组件通常 clickable=false，真正可点击的是父级 Row
     """
-    comps = find_by_text(layout, text)
+    comps = find_by_text_nearest(layout, text)
     if not comps:
         return False
     center = parse_bounds(attr(comps[0], 'bounds'))
@@ -275,75 +285,97 @@ def read_toggle_state(comp):
 
 def read_status_toggle_row(layout, target_text):
     """toggle_row: 找目标文本附近的 Toggle, 读 checked"""
-    comps = find_by_text(layout, target_text)
+    comps = find_by_text_nearest(layout, target_text)
     if not comps:
         return None
-    center = parse_bounds(attr(comps[0], 'bounds'))
-    if not center:
-        return 'unknown'
     toggles = find_toggles(layout)
-    for tg in toggles:
-        tc = parse_bounds(attr(tg, 'bounds'))
-        if tc and abs(tc[1] - center[1]) < 80 and abs(tc[0] - center[0]) < 1200:
-            return read_toggle_state(tg)
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for tg in toggles:
+            tc = parse_bounds(attr(tg, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 80 and abs(tc[0] - center[0]) < 1200:
+                return read_toggle_state(tg)
     return 'unknown'
 
 
 def read_status_button_card(layout, target_text):
     """button_card: 找目标附近的 Button, 读按钮文本"""
-    comps = find_by_text(layout, target_text)
+    comps = find_by_text_nearest(layout, target_text)
     if not comps:
         return None
-    center = parse_bounds(attr(comps[0], 'bounds'))
-    if not center:
-        return 'unknown'
     buttons = find_buttons(layout)
-    for btn in buttons:
-        bc = parse_bounds(attr(btn, 'bounds'))
-        if bc and 20 < abs(bc[1] - center[1]) < 300:
-            bt = get_text(btn)
-            if '立即开启' in bt or '开启' in bt:
-                return 'off'
-            if '立即关闭' in bt or '关闭' in bt:
-                return 'on'
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for btn in buttons:
+            bc = parse_bounds(attr(btn, 'bounds'))
+            if bc and 20 < abs(bc[1] - center[1]) < 300:
+                bt = get_text(btn)
+                if '立即开启' in bt or '开启' in bt:
+                    return 'off'
+                if '立即关闭' in bt or '关闭' in bt:
+                    return 'on'
     return 'unknown'
 
 
 def read_status_text_value(layout, target_text, text_on='已开启', text_off='已关闭'):
     """text_value: 找目标右侧同行 Text, 读其内容"""
-    comps = find_by_text(layout, target_text)
+    comps = find_by_text_nearest(layout, target_text)
     if not comps:
         return None
-    center = parse_bounds(attr(comps[0], 'bounds'))
-    if not center:
-        return 'unknown'
     all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
-    for t in all_texts:
-        tc = parse_bounds(attr(t, 'bounds'))
-        if tc and abs(tc[1] - center[1]) < 60 and tc[0] > center[0] + 50:
-            val = get_text(t)
-            if text_off in val:
-                return 'off'
-            if text_on in val:
-                return 'on'
-            return f'unknown({val})'
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for t in all_texts:
+            tc = parse_bounds(attr(t, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 60 and tc[0] > center[0] + 50:
+                val = get_text(t)
+                if text_off in val:
+                    return 'off'
+                if text_on in val:
+                    return 'on'
+                # 不是已开启/已关闭，可能是描述文字，继续找下一个
+                continue
     return 'unknown'
 
 
 def read_status_slider(layout, target_text):
     """slider_row: 读 Slider 的 text/originalText 属性 (不是 value!)"""
-    comps = find_by_text(layout, target_text)
+    comps = find_by_text_nearest(layout, target_text)
     if not comps:
         return None
-    center = parse_bounds(attr(comps[0], 'bounds'))
-    if not center:
-        return 'unknown'
     sliders = find_sliders(layout)
-    for sl in sliders:
-        sc = parse_bounds(attr(sl, 'bounds'))
-        if sc and abs(sc[1] - center[1]) < 200:
-            return attr(sl, 'text', attr(sl, 'originalText', ''))
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for sl in sliders:
+            sc = parse_bounds(attr(sl, 'bounds'))
+            if sc and abs(sc[1] - center[1]) < 200:
+                return attr(sl, 'text', attr(sl, 'originalText', ''))
     return 'unknown'
+
+
+def read_text_value_raw(layout, target_text):
+    """读取 text_value 形态目标项的右侧文本内容（不做 on/off 判断，直接返回文本）"""
+    comps = find_by_text_nearest(layout, target_text)
+    if not comps:
+        return None
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for t in all_texts:
+            tc = parse_bounds(attr(t, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 60 and tc[0] > center[0] + 50:
+                return get_text(t)
+    return None
 
 
 def read_status(layout, target_text, control_form,
@@ -390,40 +422,42 @@ def toggle_operation(layout, target_text, control_form, desired,
 
 def _toggle_toggle_row(layout, target_text, desired):
     """toggle_row: 直接点击 Toggle"""
-    comps = find_by_text(layout, target_text)
+    comps = find_by_text_nearest(layout, target_text)
     if not comps:
         return False
-    center = parse_bounds(attr(comps[0], 'bounds'))
-    if not center:
-        return False
     toggles = find_toggles(layout)
-    for tg in toggles:
-        tc = parse_bounds(attr(tg, 'bounds'))
-        if tc and abs(tc[1] - center[1]) < 80 and abs(tc[0] - center[0]) < 1200:
-            click_at(tc[0], tc[1], 2.0)
-            return True
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for tg in toggles:
+            tc = parse_bounds(attr(tg, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 80 and abs(tc[0] - center[0]) < 1200:
+                click_at(tc[0], tc[1], 2.0)
+                return True
     return False
 
 
 def _toggle_button_card(layout, target_text, desired):
     """button_card: 点击 立即开启/立即关闭 按钮"""
-    comps = find_by_text(layout, target_text)
+    comps = find_by_text_nearest(layout, target_text)
     if not comps:
         return False
-    center = parse_bounds(attr(comps[0], 'bounds'))
-    if not center:
-        return False
     buttons = find_buttons(layout)
-    for btn in buttons:
-        bc = parse_bounds(attr(btn, 'bounds'))
-        if bc and 20 < abs(bc[1] - center[1]) < 300:
-            bt = get_text(btn)
-            if desired == 'on' and ('立即开启' in bt or '开启' in bt):
-                click_at(bc[0], bc[1], 2.5)
-                return True
-            if desired == 'off' and ('立即关闭' in bt or '关闭' in bt):
-                click_at(bc[0], bc[1], 2.5)
-                return True
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for btn in buttons:
+            bc = parse_bounds(attr(btn, 'bounds'))
+            if bc and 20 < abs(bc[1] - center[1]) < 300:
+                bt = get_text(btn)
+                if desired == 'on' and ('立即开启' in bt or '开启' in bt):
+                    click_at(bc[0], bc[1], 2.5)
+                    return True
+                if desired == 'off' and ('立即关闭' in bt or '关闭' in bt):
+                    click_at(bc[0], bc[1], 2.5)
+                    return True
     return False
 
 
@@ -454,6 +488,49 @@ def _toggle_text_value(layout, target_text, desired, toggle_text):
                 click_at(tc[0], tc[1], 2.0)
             return True
     return False
+
+
+def set_slider(layout, target_text, value):
+    """
+    slider_row: 在 Slider 轨道上点击目标位置设值
+    value: 0-100
+    返回: True 如果找到并点击了 Slider
+    """
+    comps = find_by_text_nearest(layout, target_text)
+    if not comps:
+        return False
+    sliders = find_sliders(layout)
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for sl in sliders:
+            sc = parse_bounds(attr(sl, 'bounds'))
+            if sc and abs(sc[1] - center[1]) < 200:
+                fb = parse_full_bounds(attr(sl, 'bounds', ''))
+                if fb:
+                    target_x = int(fb[0] + (fb[2] - fb[0]) * value / 100)
+                    target_y = (fb[1] + fb[3]) // 2
+                    click_at(target_x, target_y)
+                    return True
+    return False
+
+
+def input_text(x, y, text):
+    """
+    在指定坐标的文本框中输入文本（长按全选 → 替换输入）
+    """
+    # 长按显示上下文菜单
+    hdc_shell('uitest', 'uiInput', 'longClick', str(x), str(y))
+    time.sleep(1.5)
+    # 点击"全选"
+    layout = dump_layout()
+    if not click_by_text(layout, '全选', 0.5):
+        # 全选菜单未出现，直接点击输入
+        click_at(x, y, 0.5)
+    # 输入新文本（替换选中的文本）
+    hdc_shell('uitest', 'uiInput', 'text', text)
+    time.sleep(1)
 
 
 # ═══════════════════════════════════════════════════════════════

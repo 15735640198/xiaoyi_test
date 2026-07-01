@@ -218,6 +218,13 @@ def set_wlan(desired):
     return toggle_setting('WLAN', 'WLAN', 'toggle_row', desired, scroll=4)
 
 
+# ── 星闪 ──
+
+def query_nearlink():
+    """查询星闪开关状态 → 'on' | 'off' | 'unknown'"""
+    return query_setting('星闪和蓝牙', '星闪', 'toggle_row', scroll=2)
+
+
 # ── 蓝牙 ──
 
 def query_bluetooth():
@@ -413,3 +420,363 @@ def disconnect_bluetooth(device_name):
 def query_brightness():
     """查询屏幕亮度值 → 字符串(如 '81.000000') | 'unknown'"""
     return query_setting('显示和亮度', '亮度', 'slider_row', scroll=2)
+
+
+# ── 朗读速度（语速）──
+
+def _navigate_to_speech_rate_page():
+    """
+    导航到语速设置页面: 设置 > 关怀和无障碍 > 屏幕朗读 > 更多设置 > 语音设置
+    返回: 页面 layout 或 None
+    """
+    layout = navigate_to_page('关怀和无障碍', 4)
+    if not layout:
+        return None
+    # 点击"屏幕朗读"进入子页面
+    if not click_by_text(layout, '屏幕朗读', 2.5):
+        for _ in range(4):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '屏幕朗读', 2.5):
+                break
+        else:
+            return None
+    # 点击"更多设置"进入第三级页面
+    layout = dump_layout()
+    if not click_by_text(layout, '更多设置', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '更多设置', 2.5):
+                break
+        else:
+            return None
+    # 点击"语音设置"进入第四级页面
+    layout = dump_layout()
+    if not click_by_text(layout, '语音设置', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '语音设置', 2.5):
+                break
+        else:
+            return None
+    return dump_layout()
+
+
+def query_speech_rate():
+    """
+    查询语速（朗读速度） → 字符串(如 '10000.000000') | 'unknown' | None
+    """
+    layout = _navigate_to_speech_rate_page()
+    if not layout:
+        return None
+    return read_status(layout, '语速', 'slider_row')
+
+
+def set_speech_rate(value):
+    """
+    设置语速（朗读速度）
+    value: 0-100（轨道百分比）
+    返回: (success: bool, new_value: str)
+    """
+    layout = _navigate_to_speech_rate_page()
+    if not layout:
+        return False, None
+    success = set_slider(layout, '语速', value)
+    if not success:
+        return False, None
+    time.sleep(1)
+    layout = dump_layout()
+    new_val = read_status(layout, '语速', 'slider_row')
+    return (new_val is not None and new_val != 'unknown'), new_val
+
+
+# ── 锁屏方式 ──
+
+def query_lock_screen_method():
+    """
+    查询锁屏方式状态 → dict | None
+
+    返回:
+        {
+            'face': 'enrolled' | 'not_enrolled' | 'unknown',
+            'fingerprint': 'enrolled' | 'not_enrolled' | 'unknown',
+            'lock_password': 'set' | 'unknown',
+        }
+
+    注意: 锁屏密码类型(图案/PIN/密码)需进入安全验证页面才能查看，无法自动化查询。
+          若人脸或指纹已录入，可推断锁屏密码已设置。
+    """
+    layout = navigate_to_page('生物识别和密码', 2)
+    if not layout:
+        return None
+
+    result = {'face': 'unknown', 'fingerprint': 'unknown', 'lock_password': 'unknown'}
+
+    # 人脸识别和指纹是卡片布局（左右并排），状态在 Column 文本中（如 "人脸识别, 未录入"）
+    for keyword, key in [('人脸识别', 'face'), ('指纹', 'fingerprint')]:
+        comps = find_by_text(layout, keyword)
+        for c in comps:
+            text = get_text(c)
+            if '已录入' in text:
+                result[key] = 'enrolled'
+                break
+            if '未录入' in text:
+                result[key] = 'not_enrolled'
+                break
+
+    # 锁屏密码: 人脸或指纹已录入 → 密码必已设置（知识库: 指纹/人脸需先设密码）
+    if result['face'] == 'enrolled' or result['fingerprint'] == 'enrolled':
+        result['lock_password'] = 'set'
+
+    return result
+
+
+# ── 来电铃声 ──
+
+def _navigate_to_ringtone_page():
+    """
+    导航到来电铃声选择页: 设置 > 声音和振动 > 来电铃声
+    返回: 页面 layout 或 None
+    """
+    layout = navigate_to_page('声音和振动', 3)
+    if not layout:
+        return None
+    if not click_by_text(layout, '来电铃声', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '来电铃声', 2.5):
+                break
+        else:
+            return None
+    return dump_layout()
+
+
+def _get_checked_ringtone(layout):
+    """获取当前选中铃声 Radio 的 (名称, 是否默认)"""
+    radios = find_components(layout, lambda c: attr(c, 'type', '') == 'Radio')
+    for radio in radios:
+        if attr(radio, 'checked', '') == 'true':
+            name = get_text(radio)
+            return name, '(默认)' in name
+    return None, False
+
+
+def query_ringtone():
+    """
+    查询来电铃声是否为默认铃声 → dict | None
+
+    返回:
+        {'sim1': {'name': str, 'is_default': bool}, 'sim2': {...}}  (双卡)
+        {'default': {'name': str, 'is_default': bool}}              (单卡/无卡)
+    """
+    layout = _navigate_to_ringtone_page()
+    if not layout:
+        return None
+
+    has_dual_sim = bool(find_by_text(layout, '卡 1')) and bool(find_by_text(layout, '卡 2'))
+
+    if has_dual_sim:
+        result = {}
+        for tab_text, key in [('卡 1', 'sim1'), ('卡 2', 'sim2')]:
+            click_by_text(layout, tab_text, 1.5)
+            layout = dump_layout()
+            name, is_default = _get_checked_ringtone(layout)
+            result[key] = {'name': name, 'is_default': is_default}
+        return result
+    else:
+        name, is_default = _get_checked_ringtone(layout)
+        return {'default': {'name': name, 'is_default': is_default}}
+
+
+def set_ringtone_default():
+    """
+    设置来电铃声为默认铃声
+    返回: (success: bool, results: dict)
+    """
+    layout = _navigate_to_ringtone_page()
+    if not layout:
+        return False, None
+
+    has_dual_sim = bool(find_by_text(layout, '卡 1')) and bool(find_by_text(layout, '卡 2'))
+    tabs = [('卡 1', 'sim1'), ('卡 2', 'sim2')] if has_dual_sim else [(None, 'default')]
+
+    all_success = True
+    results = {}
+
+    for tab_text, key in tabs:
+        if tab_text:
+            click_by_text(layout, tab_text, 1.5)
+            layout = dump_layout()
+
+        # 检查当前是否已是默认
+        name, is_default = _get_checked_ringtone(layout)
+        if is_default:
+            results[key] = {'name': name, 'is_default': True}
+            continue
+
+        # 查找含"(默认)"的 Radio 并点击
+        radios = find_components(layout, lambda c: attr(c, 'type', '') == 'Radio')
+        clicked = False
+        for radio in radios:
+            if '(默认)' in get_text(radio):
+                center = parse_bounds(attr(radio, 'bounds'))
+                if center:
+                    click_at(center[0], center[1], 2.0)
+                    clicked = True
+                    break
+
+        if clicked:
+            layout = dump_layout()
+            name, is_default = _get_checked_ringtone(layout)
+            results[key] = {'name': name, 'is_default': is_default}
+            if not is_default:
+                all_success = False
+        else:
+            results[key] = {'name': None, 'is_default': False}
+            all_success = False
+
+    return all_success, results
+
+
+# ── 热点配置（名称、密码、加密方式）──
+
+def _navigate_to_hotspot_page():
+    """
+    导航到个人热点子页面: 设置 > 移动网络 > 个人热点
+    返回: 页面 layout 或 None
+    """
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return None
+    if not click_by_text(layout, '个人热点', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '个人热点', 2.5):
+                break
+        else:
+            return None
+    return dump_layout()
+
+
+def query_hotspot_config():
+    """
+    查询热点配置 → dict | None
+    {
+        'name': str,              # 热点名称
+        'password': str,          # 密码
+        'encryption': str,        # 加密方式（HarmonyOS 固定 WPA2-PSK）
+    }
+    """
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return None
+
+    result = {}
+    result['name'] = read_text_value_raw(layout, '设备名称')
+    result['password'] = read_text_value_raw(layout, '密码')
+    result['encryption'] = 'WPA2-PSK (固定，不可配置)'
+    return result
+
+
+def set_hotspot_name(name):
+    """
+    设置热点名称 → (success: bool, new_name: str)
+    """
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return False, None
+    if not click_by_text(layout, '设备名称', 2.5):
+        return False, None
+    layout = dump_layout()
+    inputs = find_components(layout, lambda c: attr(c, 'type', '') == 'TextInput')
+    if not inputs:
+        return False, None
+    fb = parse_full_bounds(attr(inputs[0], 'bounds', ''))
+    if not fb:
+        return False, None
+    cx = (fb[0] + fb[2]) // 2
+    cy = (fb[1] + fb[3]) // 2
+    input_text(cx, cy, name)
+    # 点击"确定"
+    layout = dump_layout()
+    click_by_text(layout, '确定', 2.0)
+    # 验证
+    layout = dump_layout()
+    new_name = read_text_value_raw(layout, '设备名称')
+    return (new_name == name), new_name
+
+
+def set_hotspot_password(password):
+    """
+    设置热点密码 → (success: bool, new_password: str)
+    """
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return False, None
+    if not click_by_text(layout, '密码', 2.5):
+        return False, None
+    layout = dump_layout()
+    inputs = find_components(layout, lambda c: attr(c, 'type', '') == 'TextInput')
+    if not inputs:
+        return False, None
+    fb = parse_full_bounds(attr(inputs[0], 'bounds', ''))
+    if not fb:
+        return False, None
+    cx = (fb[0] + fb[2]) // 2
+    cy = (fb[1] + fb[3]) // 2
+    input_text(cx, cy, password)
+    # 点击"确定"
+    layout = dump_layout()
+    click_by_text(layout, '确定', 2.0)
+    # 验证
+    layout = dump_layout()
+    new_pwd = read_text_value_raw(layout, '密码')
+    return (new_pwd == password), new_pwd
+
+
+# ── 自动调节亮度 ──
+
+def query_auto_brightness():
+    """查询自动调节亮度状态 → 'on' | 'off' | 'unknown'"""
+    return query_setting('显示和亮度', '自动调节', 'toggle_row', scroll=2)
+
+
+def set_auto_brightness(desired):
+    """设置自动调节亮度 → (success, new_status)"""
+    return toggle_setting('显示和亮度', '自动调节', 'toggle_row', desired, scroll=2)
+
+
+# ── 电子书模式 ──
+
+def query_ebook_mode():
+    """查询电子书模式状态 → 'on' | 'off' | 'unknown'"""
+    return query_setting('显示和亮度', '电子书模式', 'text_value', scroll=2)
+
+
+# ── 系统导航模式 ──
+
+def query_navigation_mode():
+    """
+    查询系统导航模式 → '手势导航' | '三键导航' | 'unknown' | None(未找到)
+
+    系统 > 系统导航子页面, 通过"三键导航"Toggle 判断:
+      三键导航 off → 手势导航
+      三键导航 on  → 三键导航
+    """
+    layout = navigate_to_page('系统', 4)
+    if not layout:
+        return None
+    # 进入系统导航子页面
+    if not click_by_text(layout, '系统导航', 2.5):
+        return None
+    layout = dump_layout()
+    status = read_status_toggle_row(layout, '三键导航')
+    if status == 'on':
+        return '三键导航'
+    if status == 'off':
+        return '手势导航'
+    return 'unknown'
