@@ -39,11 +39,25 @@ xxx_manager.py     CLI 脚本: 命令行参数解析 → 调用 API → 输出�
 1. **环境信息**（第一章）：hdc 路径、包名/Ability 名
 2. **目标页面**（第三章）：导航路径、入口文本
 3. **滑动需求**（第八章）：滑动屏数
-4. **控件形态**（第六章）：toggle_row / button_card / text_value / slider_row / nav_item
+4. **控件形态**（第六章）：toggle_row / button_card / text_value / slider_row / nav_item / button_selected
 5. **第三级页面**（第四章）：子页面 Toggle 文本（开关操作时需要）
 6. **安全认证门**（第九章）：是否需要前置认证
-7. **弹窗信息**（第七章）：是否触发弹窗/选择器
-8. **页面加载时间**（第十二章）：是否需要额外等待
+7. **弹窗信息**（第七章 + 第十章 10.3）：是否触发弹窗/选择器
+8. **页面加载时间**（第十二章 + 第十章 10.7）：是否需要额外等待
+9. **⚠ 交互模式**（第十章 10.2）：匹配操作类型对应的交互模式 — **这是避免调试的关键步骤**
+
+### 第 2.5 步：匹配交互模式（避免调试的关键）
+
+在编写 API 函数前，先在知识库第十章「通用交互模式」的 10.2 交互模式索引中找到匹配的模式：
+
+1. 识别操作类型：开关切换？查询？输入文本？连接设备？选择选项？
+2. 在 10.2 索引表中找到匹配模式（A-L）
+3. 按模式流程 + 第三章页面结构 → 直接编写代码
+4. 检查 10.3 是否有已知弹窗需要处理
+5. 检查 10.6 避坑清单是否有已知陷阱
+6. 若模式+页面结构都齐全 → 直接生成，无需调试
+7. 若模式已知但页面结构未知 → 只探索缺失的页面结构
+8. 若模式未知 → 探索完整流程后补充到第十章
 
 ### 第 3 步：在 settings_api.py 中添加 API 函数
 
@@ -72,7 +86,7 @@ def set_zoom_gesture(desired):
 | 个人热点 | `query_personal_hotspot()` | — |
 | 省电模式 | `query_power_saving()` | `set_power_saving('on'/'off')` |
 | 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
-| WLAN | `query_wlan()` | `set_wlan('on'/'off')` |
+| WLAN | `query_wlan()` | `set_wlan('on'/'off')` / `connect_wlan(ssid, password)` |
 | 星闪 | `query_nearlink()` | — |
 | 蓝牙开关 | `query_bluetooth()` | — |
 | 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
@@ -84,6 +98,13 @@ def set_zoom_gesture(desired):
 | 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
 | 电子书模式 | `query_ebook_mode()` | — |
 | 系统导航模式 | `query_navigation_mode()` | — |
+| 默认数据卡 | `query_default_data_card()` | — |
+| WLAN下自动下载 | `query_wlan_auto_download()` | `set_wlan_auto_download('on'/'off')` |
+| SIM卡状态 | `query_sim_status()` / `query_sim_carrier()` | — |
+| SIM卡使用状态 | `query_sim_enabled(card)` | `set_sim_enabled(card, 'on'/'off')` |
+| 网络加速 | `query_network_acceleration()` | `set_network_acceleration('on'/'off')` |
+| 系统语言 | `query_system_language()` | `add_system_language(lang)` |
+| 默认输入法 | `query_default_input_method()` | — |
 
 ### 第 4 步：生成 CLI 脚本（薄壳）
 
@@ -131,6 +152,7 @@ if __name__ == '__main__':
 | text_value | 文本右侧有文本 | 右侧文本内容 | 进子页面 → Toggle |
 | slider_row | 文本附近有 Slider | `attr(slider, 'text')`（不是 value！） | 按比例点轨道 |
 | nav_item | 可点击、无状态 | 进子页面查看 | 进子页面 |
+| button_selected | 文本右侧有多个 Button | `attr(button, 'selected')` = true 的 Button 内 Text | 点 selected=false 的 Button |
 
 ## 关键规则
 
@@ -138,11 +160,12 @@ if __name__ == '__main__':
 2. **选择器选项是 `MenuItem` 类型，不是 `Text`**
 3. **Text 组件通常 `clickable=false`** — 要点击父级 Row
 4. **`find_by_text` 是子串匹配** — 目标文本若是页面标题子串（如 `星闪` ← `星闪和蓝牙`），会碰撞命中标题导致 `unknown`。所有 `read_status_*`/`_toggle_*`/`click_by_text` 已改用 `find_by_text_nearest()` 按文本长度差排序规避。新增设置项时检查目标文本是否是入口文本的子串
-5. **toggle_row 和 button_card 操作不会触发弹窗**
+5. **toggle_row 和 button_card 操作通常不触发弹窗** — 例外: 部分 toggle_row 关闭时弹出确认对话框（如"WLAN 下自动下载"），需在 toggle 后检查并点击确认按钮
 6. **text_value 开关需要 3 步**：列表页 → 点击项 → 子页面 Toggle → 返回 → 验证
 7. **导航前先 force-stop** — 使用 `restart_settings()`
 8. **属性是嵌套的**：`node["attributes"]["text"]`
 9. **API 函数不应包含 print** — 只返回结果，打印交给 CLI 脚本
+10. **搜索直达** — 当设置项导航层级过深或不在常规入口时，用 `search_setting(keyword, result_text)` 通过设置首页搜索框搜索并跳转。搜索结果文本可能与输入不同（如带空格），需用实际结果文本作为 `result_text`
 
 ## 脚本命名规范
 
@@ -153,8 +176,8 @@ if __name__ == '__main__':
 
 ```
 ui_test_scriptss/
-├── hdc_utils.py              底层工具 (581行)
-├── settings_api.py           业务 API (782行)
+├── hdc_utils.py              底层工具 (618行)
+├── settings_api.py           业务 API (1178行)
 ├── template.py               CLI 模板 (62行)
 ├── query_zoom_gesture_state.py     41行
 ├── query_nearlink_state.py         41行
@@ -168,6 +191,14 @@ ui_test_scriptss/
 ├── hotspot_config_manager.py       75行
 ├── auto_brightness_manager.py      50行
 ├── query_multi_status.py           综合查询 (省电/亮度/电子书/导航)
+├── query_default_data_card.py      40行
+├── wlan_auto_download_manager.py   50行
+├── wlan_connect_manager.py         WiFi 连接 (ssid+password)
+├── sim_card_manager.py             SIM卡状态/运营商/使用状态
+├── network_acceleration_manager.py 网络加速
+├── language_manager.py             系统语言查询/添加
+├── input_method_manager.py         默认输入法查询
+├── 脚本生成失败说明.md             无法生成的功能及原因
 ├── HarmonyOS设置功能知识库.md       知识库 v5 (15章, 1527行)
 └── SKILL.md                        本文件
 ```

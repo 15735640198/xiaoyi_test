@@ -218,6 +218,96 @@ def set_wlan(desired):
     return toggle_setting('WLAN', 'WLAN', 'toggle_row', desired, scroll=4)
 
 
+def connect_wlan(ssid, password=None):
+    """
+    连接指定 WiFi 网络 → (success, message)
+
+    Args:
+        ssid: WiFi 名称
+        password: WiFi 密码 (开放网络可不传)
+
+    Returns:
+        (True, '已连接') 成功
+        (False, 原因) 失败
+    """
+    layout = navigate_to_page('WLAN', 4)
+    if not layout:
+        return False, '未找到WLAN入口'
+
+    # 确保 WLAN 已开启
+    wlan_status = read_status_toggle_row(layout, 'WLAN')
+    if wlan_status == 'off':
+        toggle_operation(layout, 'WLAN', 'toggle_row', 'on')
+        time.sleep(3)
+        layout = dump_layout()
+    elif wlan_status != 'on':
+        return False, f'WLAN开关状态异常: {wlan_status}'
+
+    # 滑动查找目标 WiFi
+    found_layout = None
+    for i in range(5):
+        if find_by_text_nearest(layout, ssid):
+            found_layout = layout
+            break
+        swipe_up()
+        layout = dump_layout()
+
+    if not found_layout:
+        return False, f'未找到WiFi: {ssid}'
+
+    # 点击 WiFi
+    click_by_text(layout, ssid, 3.0)
+    layout = dump_layout()
+
+    # 检查是否已连接 (详情页有"断开连接")
+    if find_by_text(layout, '断开连接'):
+        return True, '已连接(无需重复连接)'
+
+    # 查找密码输入框
+    ti = None
+    for c in find_components(layout, lambda c: attr(c, 'type') == 'TextInput'):
+        ti = c
+        break
+
+    if ti:
+        if not password:
+            return False, '需要密码但未提供'
+        center = parse_bounds(attr(ti, 'bounds'))
+        if not center:
+            return False, '无法定位密码输入框'
+        click_at(center[0], center[1], 0.5)
+        hdc_shell('uitest', 'uiInput', 'text', password)
+        time.sleep(1)
+        # 点击"连接"
+        layout = dump_layout()
+        click_by_text(layout, '连接', 5.0)
+    else:
+        # 无密码输入框 = 已保存/开放网络, 点击后自动连接
+        # 直接等待验证, 不需要额外操作
+        pass
+
+    # 等待连接结果
+    time.sleep(5)
+    layout = dump_layout()
+
+    # 验证: 检查 WiFi 名称旁是否有"已连接"
+    comps = find_by_text_nearest(layout, ssid)
+    if not comps:
+        return False, '连接后未找到WiFi'
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for t in all_texts:
+            tc = parse_bounds(attr(t, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 100 and tc[0] > center[0] - 50:
+                val = get_text(t)
+                if '已连接' in val:
+                    return True, '已连接'
+    return False, '连接超时或密码错误'
+
+
 # ── 星闪 ──
 
 def query_nearlink():
@@ -780,3 +870,326 @@ def query_navigation_mode():
     if status == 'off':
         return '手势导航'
     return 'unknown'
+
+
+# ── 默认数据卡 ──
+
+def query_default_data_card():
+    """
+    查询默认移动数据卡 → '卡 1' | '卡 2' | 'unknown' | None(未找到)
+
+    移动网络 > SIM 卡管理, "默认移动数据"行有两个 Button(卡1/卡2),
+    Button 的 selected 属性标识当前选择。
+    """
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return None
+    if not click_by_text(layout, 'SIM 卡管理', 2.5):
+        return None
+    layout = dump_layout()
+
+    # 找"默认移动数据"文本
+    comps = find_by_text_nearest(layout, '默认移动数据')
+    if not comps:
+        return None
+
+    buttons = find_buttons(layout)
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        # 找同一行右侧 selected=true 的 Button
+        for btn in buttons:
+            bc = parse_bounds(attr(btn, 'bounds'))
+            if bc and abs(bc[1] - center[1]) < 80 and bc[0] > center[0]:
+                if attr(btn, 'selected') == 'true':
+                    # 找 Button 内的 Text
+                    fb = parse_full_bounds(attr(btn, 'bounds'))
+                    if not fb:
+                        return 'unknown'
+                    for t in all_texts:
+                        tb = parse_full_bounds(attr(t, 'bounds'))
+                        if (tb and fb[0] <= tb[0] and tb[2] <= fb[2]
+                                and fb[1] <= tb[1] and tb[3] <= fb[3]):
+                            return get_text(t).strip()
+                    return 'unknown'
+    return 'unknown'
+
+
+# ── WLAN 下自动下载 ──
+
+def query_wlan_auto_download():
+    """
+    查询 WLAN 下自动下载状态 → 'on' | 'off' | 'unknown' | None(未找到)
+
+    通过设置搜索框搜索"WLAN下自动下载"跳转到 更新选项 页面。
+    实际路径: 关于本机 > 软件更新 > 更新选项, 但搜索直达更高效。
+    """
+    layout = search_setting('WLAN下自动下载', 'WLAN 下自动下载')
+    if not layout:
+        return None
+    return read_status_toggle_row(layout, 'WLAN 下自动下载')
+
+
+def set_wlan_auto_download(desired):
+    """
+    设置 WLAN 下自动下载 → (success, new_status)
+
+    desired: 'on' 或 'off'
+    """
+    layout = search_setting('WLAN下自动下载', 'WLAN 下自动下载')
+    if not layout:
+        return False, None
+    status = read_status_toggle_row(layout, 'WLAN 下自动下载')
+    if status is None:
+        return False, None
+    if status == desired:
+        return True, status
+    success = toggle_operation(layout, 'WLAN 下自动下载', 'toggle_row', desired)
+    if not success:
+        return False, status
+    time.sleep(1)
+    layout = dump_layout()
+    # 关闭时弹出确认对话框，点击"关闭"确认
+    if click_by_text(layout, '关闭', 2.0):
+        time.sleep(1)
+        layout = dump_layout()
+    new_status = read_status_toggle_row(layout, 'WLAN 下自动下载')
+    return (new_status == desired), new_status
+
+
+# ── SIM 卡管理 ──
+
+def _navigate_to_sim_management():
+    """导航到 SIM 卡管理子页面，返回 layout"""
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return None
+    if not click_by_text(layout, 'SIM 卡管理', 2.5):
+        return None
+    return dump_layout()
+
+
+def query_sim_status():
+    """
+    查询双卡状态 → dict {'卡 1': '未插卡'|运营商名, '卡 2': ...}
+
+    移动网络 > SIM 卡管理, 卡槽旁的文本标识插卡状态。
+    """
+    layout = _navigate_to_sim_management()
+    if not layout:
+        return None
+    result = {}
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+    for card in ['卡 1', '卡 2']:
+        comps = find_by_text_nearest(layout, card)
+        if not comps:
+            result[card] = 'unknown'
+            continue
+        found = False
+        for comp in comps:
+            center = parse_bounds(attr(comp, 'bounds'))
+            if not center or center[1] > 800:
+                continue  # 跳过"默认移动数据"区域的同名文本
+            for t in all_texts:
+                tc = parse_bounds(attr(t, 'bounds'))
+                if (tc and abs(tc[1] - center[1]) < 60
+                        and tc[0] > center[0] + 50):
+                    result[card] = get_text(t).strip()
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            result[card] = 'unknown'
+    return result
+
+
+def query_sim_carrier():
+    """
+    查询 SIM 运营商归属 → dict {'卡 1': 运营商名|None, '卡 2': ...}
+
+    未插卡时返回 None。
+    """
+    status = query_sim_status()
+    if not status:
+        return None
+    result = {}
+    for card, val in status.items():
+        if val in ('未插卡', 'unknown'):
+            result[card] = None
+        else:
+            result[card] = val
+    return result
+
+
+def query_sim_enabled(card='卡 1'):
+    """
+    查询指定 SIM 卡使用状态 → 'on' | 'off' | 'unknown' | None
+
+    card: '卡 1' 或 '卡 2'
+    SIM 卡管理页面, 卡槽旁有 Toggle 控制启用/禁用。
+    """
+    layout = _navigate_to_sim_management()
+    if not layout:
+        return None
+    return read_status_toggle_row(layout, card)
+
+
+def set_sim_enabled(card, desired):
+    """
+    设置指定 SIM 卡使用状态 → (success, new_status)
+
+    card: '卡 1' 或 '卡 2'
+    desired: 'on' 或 'off'
+    """
+    layout = _navigate_to_sim_management()
+    if not layout:
+        return False, None
+    status = read_status_toggle_row(layout, card)
+    if status is None:
+        return False, None
+    if status == desired:
+        return True, status
+    success = toggle_operation(layout, card, 'toggle_row', desired)
+    if not success:
+        return False, status
+    time.sleep(1)
+    layout = dump_layout()
+    new_status = read_status_toggle_row(layout, card)
+    return (new_status == desired), new_status
+
+
+# ── 网络加速 ──
+
+def query_network_acceleration():
+    """
+    查询"允许使用移动数据加速网络"状态 → 'on' | 'off' | 'unknown'
+
+    移动网络 > 网络加速, toggle_row 形态。
+    """
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return None
+    for i in range(4):
+        if find_by_text(layout, '网络加速'):
+            break
+        swipe_up()
+        layout = dump_layout()
+    if not click_by_text(layout, '网络加速', 2.5):
+        return None
+    layout = dump_layout()
+    return read_status_toggle_row(layout, '允许使用移动数据加速网络')
+
+
+def set_network_acceleration(desired):
+    """
+    设置"允许使用移动数据加速网络" → (success, new_status)
+    """
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return False, None
+    for i in range(4):
+        if find_by_text(layout, '网络加速'):
+            break
+        swipe_up()
+        layout = dump_layout()
+    if not click_by_text(layout, '网络加速', 2.5):
+        return False, None
+    layout = dump_layout()
+    status = read_status_toggle_row(layout, '允许使用移动数据加速网络')
+    if status is None:
+        return False, None
+    if status == desired:
+        return True, status
+    success = toggle_operation(layout, '允许使用移动数据加速网络',
+                               'toggle_row', desired)
+    if not success:
+        return False, status
+    time.sleep(1)
+    layout = dump_layout()
+    new_status = read_status_toggle_row(layout, '允许使用移动数据加速网络')
+    return (new_status == desired), new_status
+
+
+# ── 系统语言 ──
+
+def query_system_language():
+    """
+    查询当前系统语言 → 语言名称 (如 '简体中文') | None
+
+    系统 > 语言和地区, 语言名在"语言"标题下方 (非右侧, 右侧是"编辑"按钮)。
+    """
+    layout = navigate_to_page('系统', 4)
+    if not layout:
+        return None
+    if not click_by_text(layout, '语言和地区', 2.5):
+        return None
+    layout = dump_layout()
+    # 找"语言"文本, 然后在其下方找语言名
+    comps = find_by_text_nearest(layout, '语言')
+    if not comps:
+        return None
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        # 在"语言"下方 (y > center_y + 50, y < center_y + 200) 找文本
+        for t in all_texts:
+            tc = parse_bounds(attr(t, 'bounds'))
+            if (tc and tc[1] > center[1] + 30 and tc[1] < center[1] + 200
+                    and abs(tc[0] - center[0]) < 300):
+                val = get_text(t).strip()
+                if val and val != '编辑' and val != '添加语言':
+                    return val
+    return None
+
+
+def add_system_language(language):
+    """
+    添加系统语言 → (success, message)
+
+    language: 语言中文名 (如 '英语', '繁体中文')
+    流程: 语言和地区 → 添加语言 → 点击目标语言
+    注意: 仅添加到语言列表, 不自动设为默认。设为默认需手动拖拽排序。
+    """
+    layout = navigate_to_page('系统', 4)
+    if not layout:
+        return False, '未找到系统入口'
+    if not click_by_text(layout, '语言和地区', 2.5):
+        return False, '未找到语言和地区'
+    layout = dump_layout()
+    if not click_by_text(layout, '添加语言', 2.5):
+        return False, '未找到添加语言入口'
+    layout = dump_layout()
+    # 在语言列表中查找并点击目标语言
+    if click_by_text(layout, language, 3.0):
+        time.sleep(1)
+        layout = dump_layout()
+        # 可能有确认弹窗
+        for btn in ['确定', '添加', '确认']:
+            if click_by_text(layout, btn, 2.0):
+                time.sleep(1)
+                break
+        return True, f'已添加语言: {language}'
+    return False, f'未找到语言: {language}'
+
+
+# ── 输入法 ──
+
+def query_default_input_method():
+    """
+    查询默认输入法 → 输入法名称 (如 '小艺输入法') | None
+
+    系统 > 输入法, "默认输入法"行右侧显示当前输入法。
+    """
+    layout = navigate_to_page('系统', 4)
+    if not layout:
+        return None
+    if not click_by_text(layout, '输入法', 2.5):
+        return None
+    layout = dump_layout()
+    return read_text_value_raw(layout, '默认输入法')

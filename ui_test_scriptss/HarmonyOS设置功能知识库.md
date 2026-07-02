@@ -112,6 +112,29 @@
 | 添加其他网络 | nav_item | — |
 | WLAN 安全检测 | toggle_row | checked → ON/OFF |
 
+#### 3.1.1 WiFi 连接流程
+
+WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text ("已连接"/"已保存"/"加密"/"开放").
+点击 WiFi 名称后的行为取决于网络状态:
+
+| 场景 | 点击后行为 | 处理方法 |
+|------|----------|---------|
+| 已连接 | 进入详情页 (有"断开连接"/"删除该网络") | `find_by_text(layout, '断开连接')` 检测, 返回已连接 |
+| 已保存 (密码保留) | 自动连接, 无弹窗 | 无需操作, 等待验证 |
+| 已保存 (开放网络) | 自动连接, 无弹窗 | 无需操作, 等待验证 |
+| 新加密网络 | 弹出密码输入弹窗 | TextInput(hint="密码") + `uitest uiInput text <密码>` + 点"连接"按钮 |
+
+**密码输入弹窗结构**:
+- 标题: WiFi 名称
+- TextInput: hint="密码", 在页面上半部 (center≈(660, 465))
+- "隐私" + "使用随机 MAC" 选项
+- "高级选项" 可展开
+- "连接" 按钮 (Text, clickable=false, 在 Button 内)
+
+**连接验证**: 等待 5s 后 dump layout, 检查 WiFi 名称旁是否有"已连接"文本
+
+**API**: `connect_wlan(ssid, password)` → `(success, message)`
+
 ---
 
 ### 3.2 星闪和蓝牙
@@ -160,6 +183,30 @@
 | 国际上网服务 | nav_item | — | |
 | VPN | nav_item | — | |
 
+#### 3.3.2 SIM 卡管理子页面
+
+- **导航路径**: 设置 > 移动网络 > SIM 卡管理
+- **入口文本**: `SIM 卡管理`
+
+| 子项 | 形态 | 状态/操作说明 |
+|------|------|------------|
+| 卡 1 | text_value + toggle_row | 右侧"未插卡"或运营商名称; 卡槽旁有 Toggle 控制启用/禁用 |
+| 卡 2 | text_value + toggle_row | 右侧"未插卡"或运营商名称; 卡槽旁有 Toggle 控制启用/禁用 |
+| 双卡上网 | 分区标题 | — |
+| 默认移动数据 | button_selected | 右侧两个 Button("卡 1"/"卡 2"), Button 的 selected=true 表示当前选中 |
+| 双卡通话 | 分区标题 | — |
+| 默认拨号卡 | text_value | 右侧"不设置"或卡号 |
+| 高级 | 分区标题 | — |
+| SIM 卡保护 | nav_item | — |
+| 天际通服务 | nav_item | — |
+| 国际上网服务 | nav_item | — |
+
+**默认移动数据 (button_selected 形态)**:
+- "默认移动数据" Text 在左侧, 右侧 Stack 内有两个 Button
+- Button 的 text 属性为空, 内含 Column → Text("卡 1"/"卡 2")
+- `selected=true` 的 Button 是当前默认数据卡
+- 查询: `query_default_data_card()` → '卡 1' | '卡 2'
+
 #### 3.3.1 个人热点子页面
 
 - **导航路径**: 设置 > 移动网络 > 个人热点
@@ -185,6 +232,35 @@
 3. 点击"全选" → 选中文本框全部内容
 4. `uitest uiInput text <新文本>` → 替换选中的文本
 5. 点击"确定" → 保存
+
+#### 3.3.3 网络加速子页面
+
+- **导航路径**: 设置 > 移动网络 > 网络加速
+- **入口文本**: `网络加速` (需滑动 1-2 屏)
+- **子项**:
+
+| 子项 | 形态 | 状态/操作说明 |
+|------|------|------------|
+| 允许使用移动数据加速网络 | toggle_row | checked → ON/OFF |
+| 允许使用云加速 | toggle_row | checked → ON/OFF |
+| 拥塞加速 | text/nav_item | 需进一步探索 |
+| 移动网络专线加速 | text/nav_item | 需进一步探索 |
+
+- **API**: `query_network_acceleration()` / `set_network_acceleration('on'/'off')`
+- **注意**: 无"视频加速模式"选项, 实际开关名为"允许使用移动数据加速网络"
+
+#### 3.3.4 流量管理子页面
+
+- **导航路径**: 设置 > 移动网络 > 流量管理
+- **入口文本**: `流量管理` (需滑动 1-2 屏)
+- **子项**:
+
+| 子项 | 形态 | 状态/操作说明 |
+|------|------|------------|
+| 应用联网 | nav_item | 进入应用联网设置 |
+| 本月数据流量排行 | section_header + "更多"按钮 | 数据流量排行列表 |
+
+- **注意**: 无"剩余流量"信息。剩余流量是运营商业务数据，不在设置 App 中显示。
 
 ---
 
@@ -384,6 +460,46 @@
 - **开发者模式判断**: 「开发者选项」入口可见 = 已开启；不可见 = 未开启
 - **注意**: 子页面较长，需滑动 2 次才能看到底部"开发者选项"
 
+#### 3.11.1 语言和地区子页面
+
+- **导航路径**: 设置 > 系统 > 语言和地区
+- **入口文本**: `语言和地区`
+
+| 子项 | 形态 | 状态/操作说明 |
+|------|------|------------|
+| 语言 | section_header + "编辑"按钮 | 右侧有"编辑"Text (非语言名) |
+| <当前语言名> | Text (在"语言"下方) | 如"简体中文", 在标题下方而非右侧 |
+| 添加语言 | nav_item (Column clickable) | 点击进入语言列表 |
+| 地区 | section_header | — |
+| 当前地区 | text_value | 右侧"中国" |
+
+**语言名读取注意**: 语言名在"语言"标题**下方** (y 差 50-200px), 不是右侧 (右侧是"编辑"按钮)。`read_text_value_raw` 会误读"编辑", 需在下方查找。
+
+**添加语言子页面**:
+- "已添加语言" section: 显示已添加的语言 (Column clickable)
+- "所有语言" section: 可选语言列表 (Column clickable)
+- 每项: 中文名 + 原文 (如 "英语 / English", "繁体中文 / 繁體中文")
+- 点击语言项 → 添加到已添加列表
+- **设为默认需拖拽排序**: 点击"编辑"→长按拖拽到顶部, uitest 不支持此操作
+
+**API**: `query_system_language()` / `add_system_language(lang)`
+
+#### 3.11.2 输入法子页面
+
+- **导航路径**: 设置 > 系统 > 输入法
+- **入口文本**: `输入法`
+
+| 子项 | 形态 | 状态/操作说明 |
+|------|------|------------|
+| 输入法管理 | section_header | 不可点击 |
+| 默认输入法 | text_value | 右侧显示当前输入法名 (如"小艺输入法") |
+| <输入法名> | nav_item (Column clickable) | 点击进入输入法设置 |
+
+**注意**:
+- 无"添加输入法"入口。输入法作为独立 App 安装, 安装后自动出现在列表中。
+- 切换默认输入法: 点击"默认输入法"行 → 可能弹出选择器 (仅已安装输入法可选)
+- **API**: `query_default_input_method()`
+
 ---
 
 ### 3.12 应用和元服务
@@ -566,6 +682,26 @@
 | 子项 | 形态 | 状态/操作说明 |
 |------|------|------------|
 | 开启畅连通信 | button | 按钮文本判断开关状态 |
+
+### 3.17 更新选项（关于本机 > 软件更新 > 更新选项）
+
+- **导航路径**: 设置 > 关于本机 > 软件更新 > 更新选项 (3 级导航, 无法通过常规入口到达)
+- **推荐方式**: 使用 `search_setting('WLAN下自动下载', 'WLAN 下自动下载')` 搜索直达
+- **搜索关键词**: `WLAN下自动下载` (输入无空格)
+- **搜索结果文本**: `WLAN 下自动下载` (点击时需带空格)
+- **搜索结果路径提示**: `关于本机 > 软件更新 > 更新选项`
+
+| 子项 | 形态 | 状态/操作说明 |
+|------|------|------------|
+| 夜间安装 | toggle_row | checked → ON/OFF |
+| WLAN 下自动下载 | toggle_row | checked → ON/OFF; **关闭时弹出确认对话框** |
+| 协同更新 | toggle_row | checked → ON/OFF |
+
+**WLAN 下自动下载确认弹窗** (关闭时):
+- 标题: "关闭 WLAN 下自动下载"
+- 描述: "关闭后，设备将无法在 WLAN 下自动下载。确定关闭？"
+- 按钮: "取消" / "关闭"
+- 处理: `click_by_text(layout, '关闭')` 点击确认
 
 ---
 
@@ -1052,6 +1188,7 @@ def detect_form(text_node, layout):
 | text_value | 读右侧 Text | 需进子页面 | 右侧文本 | 需进子页面 |
 | slider_row | — | — | 读 `value` | 拖动/点击 Slider |
 | nav_item | 需进子页面 | 需进子页面 | 需进子页面 | 需进子页面 |
+| button_selected | — | 点 selected=false 的 Button | 读 selected=true 的 Button 内 Text | — |
 | section_header | — | — | — | — |
 
 ---
@@ -1088,7 +1225,13 @@ def detect_form(text_node, layout):
 | 开关显示电量百分比 | toggle_row | Toggle checked 变化 | 重新 dump 读 checked |
 | 音量调节 | slider_row | Slider value 变化 | 重新 dump 读 value |
 
-**关键规律**: `toggle_row` 和 `button_card` 形态的操作**都不会触发弹窗**，直接生效。
+**关键规律**: `toggle_row` 和 `button_card` 形态的操作通常**不会触发弹窗**，直接生效。
+
+**例外**: 部分 `toggle_row` 关闭时会弹出确认对话框:
+
+| 设置项 | 弹窗内容 | 确认按钮 | 处理方法 |
+|--------|---------|---------|---------|
+| WLAN 下自动下载 (关闭时) | "关闭 WLAN 下自动下载" / "关闭后，设备将无法在 WLAN 下自动下载。确定关闭？" | "关闭" | `click_by_text(layout, '关闭')` |
 
 ### 5.3 会触发选择器的操作
 
@@ -1189,6 +1332,23 @@ for opt in options:
 | 小艺 | 2 | — |
 | 畅连通信 | 2 | — |
 
+**特殊页面 — 更新选项**: 无法通过常规入口导航 (路径为 关于本机 > 软件更新 > 更新选项)，使用 `search_setting()` 搜索直达。
+
+### 搜索直达方法
+
+当设置项导航层级过深或不在常规入口时，可通过设置首页搜索框搜索并跳转:
+
+```
+search_setting(keyword, result_text)
+```
+
+流程: `restart_settings()` → 点击搜索框 (660, 387) → 找 TextInput → `uitest uiInput text <keyword>` → 等待 3s → `click_by_text(layout, result_text)` → 返回目标页 layout
+
+**注意事项**:
+- 搜索结果文本可能与输入不同（如 "WLAN下自动下载" → 结果 "WLAN 下自动下载" 带空格）
+- `result_text` 必须用搜索结果中的实际文本，不是输入的关键词
+- 搜索结果还显示路径提示（如 "关于本机 > 软件更新 > 更新选项"），可帮助确认目标
+
 **脚本策略**: 如果在第一屏未找到目标项，最多滑动 4 次查找。每次滑动后 dumpLayout 重新检测。
 
 ---
@@ -1235,44 +1395,519 @@ for opt in options:
 
 ---
 
-## 十、导航与交互模式
+## 十、通用交互模式（脚本生成前必读）
 
-### 6.1 标准导航流程
+> **目的**: 本章将所有设置操作抽象为可复用的交互模式。生成新脚本前，先匹配模式，再查页面结构（第三章），两者结合即可直接生成，避免调试。
+>
+> **使用方法**:
+> 1. 识别目标操作的类型（开关？查询？输入文本？连接设备？选择选项？）
+> 2. 在「10.2 交互模式索引」中找到匹配的模式
+> 3. 按模式流程 + 第三章页面结构 → 直接编写 API 函数
+> 4. 检查「10.3 弹窗处理」是否有已知弹窗
+> 5. 检查「10.6 避坑清单」是否有已知陷阱
+
+### 10.1 导航方法（3 种）
+
+#### 方法 A: 常规导航 `navigate_to_page(entry, scroll)`
 
 ```
-aa start (启动设置) → dumpLayout → find_by_text(入口文本) → 
-parse_bounds → uiInput click → 等待 2.5s → dumpLayout → 重复
+restart_settings() → dump_layout → find_by_text(入口) → click → 等待 2.5s → dump_layout
+（未找到则滑动 scroll 屏重试）
 ```
 
-### 6.2 滑动查找
+**适用**: 设置 > 二级页面（大多数设置项）
+**参数**: `entry`=入口文本, `scroll`=滑动屏数（查第八章）
+
+#### 方法 B: 多级导航（手动逐级点击）
 
 ```python
-# 上滑: 从下往上滑，内容向上滚动
-hdc shell uitest uiInput swipe 660 1900 660 700
-
-# 下滑(刷新/回顶部): 从上往下滑
-hdc shell uitest uiInput swipe 660 700 660 1900
+layout = navigate_to_page('一级入口', scroll)
+click_by_text(layout, '二级项', 2.5)    # 每级等待 2.5s
+layout = dump_layout()
+click_by_text(layout, '三级项', 2.5)    # 第三级
+layout = dump_layout()
+# ...更多级
 ```
 
-### 6.3 点击可点击组件
+**适用**: 语速设置（4级）、来电铃声（3级）、个人热点配置（3级）、系统导航（3级）、SIM卡管理（3级）
+**关键**: 每级点击后必须 `dump_layout()` 获取新页面，不能复用旧 layout
+**滑动**: 某级入口可能在下方，需先 `swipe_up()` 再查找
 
+#### 方法 C: 搜索直达 `search_setting(keyword, result_text)`
+
+```
+restart_settings() → click_at(660, 387) [搜索框] → 找 TextInput → click_at 激活 →
+uitest uiInput text <keyword> → 等待 3s → click_by_text(result_text) → dump_layout
+```
+
+**适用**: 导航层级 ≥3 级且入口不在常规菜单、或页面不在设置 App 常规入口
+**已知实例**: WLAN 下自动下载（关于本机 > 软件更新 > 更新选项，3级）
+**关键**: `result_text` 必须用搜索结果中的实际文本（可能带空格），不是输入的关键词
+
+---
+
+### 10.2 交互模式索引
+
+| 模式 | 操作类型 | 触发条件 | 核心流程 | 已知实例 |
+|------|---------|---------|---------|---------|
+| A | 开关切换 | toggle_row | 读 checked → 点 Toggle → 重 dump 验证 | WLAN、蓝牙、省电模式 |
+| B | 卡片按钮切换 | button_card | 读按钮文本 → 点 Button → 重 dump 读文本 | 勿扰模式 |
+| C | 子页面开关 | text_value | 点击项 → 子页面 Toggle → 返回 → 读右侧文本 | 放大手势 |
+| D | Slider 设值 | slider_row | 读 text 属性 → 按比例点轨道 → 重 dump 验证 | 语速、屏幕亮度 |
+| E | 文本输入弹窗 | 点击 text_value 项 | 弹窗 TextInput → 输入文本 → 点确定 | 热点名称/密码 |
+| F | 确认弹窗 | 关闭某些开关 | 点 Toggle → 弹窗 → 点确认按钮 | WLAN下自动下载 |
+| G | Radio 选择 | Radio 列表 | 找 checked=true → 点目标 Radio → 验证 | 来电铃声 |
+| H | MenuItem 选择器 | 点击触发选择器 | 找 MenuItem → 点目标选项 → 自动关闭 | 休眠时间 |
+| I | 自动动作 | 已保存/开放网络 | 点击 → 系统自动处理 → 等待验证 | WiFi已保存连接 |
+| J | 连接+配对弹窗 | 蓝牙设备 | 点设备 → 轮询配对弹窗 → 点配对 → 轮询连接 | 蓝牙连接 |
+| K | 入口存在性 | "存在即开启" | 滑动查找入口 → 存在=True | 开发者模式 |
+| L | button_selected | 双选 Button | 找 selected=true 的 Button → 读内嵌 Text | 默认数据卡 |
+
+#### 模式 A: toggle_row 开关切换
+
+```
+1. navigate_to_page(入口, scroll) → layout
+2. read_status_toggle_row(layout, 目标文本) → 'on'/'off'
+3. 若 status == desired: return (True, status)  # 已是目标状态
+4. _toggle_toggle_row(layout, 目标文本, desired):
+   - find_by_text_nearest 找目标 Text
+   - find_toggles 找所有 Toggle
+   - 匹配: abs(toggle_y - text_y) < 80 且 abs(toggle_x - text_x) < 1200
+   - click_at(toggle_center)
+5. time.sleep(1) → dump_layout()
+6. read_status_toggle_row(new_layout, 目标文本) → 验证
+```
+
+**坐标匹配阈值**: y 差 < 80px, x 差 < 1200px
+**验证**: 重新 dump 读 `checked` 属性
+**弹窗**: 通常无（例外见模式 F）
+
+#### 模式 B: button_card 卡片按钮切换
+
+```
+1. navigate_to_page(入口, scroll)
+2. read_status_button_card(layout, 目标文本):
+   - find_by_text_nearest 找目标 Text
+   - find_buttons 找 Button
+   - 匹配: 20 < abs(btn_y - text_y) < 300
+   - 按钮文本含 "立即开启" → off, "立即关闭" → on
+3. 若 status == desired: return
+4. _toggle_button_card: 点击对应 Button
+5. time.sleep(1) → dump → 验证按钮文本变化
+```
+
+**坐标匹配阈值**: y 差 20-300px（不能太近也不能太远）
+**验证**: 重新 dump 读按钮文本
+
+#### 模式 C: text_value 子页面开关
+
+```
+1. navigate_to_page(入口, scroll)
+2. read_status_text_value(layout, 目标文本):
+   - find_by_text_nearest 找目标 Text
+   - 在右侧 (x更大, y差<60px) 找另一个 Text
+   - 含 "已开启" → on, "已关闭" → off
+   - 非状态文本 (如描述) → continue 跳过, 继续找
+3. 若 status == desired: return
+4. _toggle_text_value:
+   a. click_by_text(layout, 目标文本) → 进入子页面
+   b. dump_layout() → sub_layout
+   c. find_by_text_nearest(sub_layout, third_level_toggle) → 找子页面 Toggle
+   d. click_at(toggle_center)
+   e. go_back() → 返回列表页
+5. dump_layout() → read_status_text_value 验证右侧文本
+```
+
+**坐标匹配阈值**: y 差 < 60px, x 差 > 50px（右侧）
+**验证**: 返回列表页读右侧文本 "已开启"/"已关闭"
+**关键**: `third_level_toggle` 参数 = 子页面内 Toggle 的文本（通常与列表项同名）
+**描述文本跳过**: `read_status_text_value` 遇到非 "已开启/已关闭" 的文本时 `continue`，不返回 unknown
+
+#### 模式 D: slider_row 设值
+
+```
+1. 导航到含 Slider 的页面（可能多级）
+2. read_status_slider(layout, 目标文本):
+   - find_by_text_nearest 找目标 Text
+   - find_sliders 找 Slider
+   - 匹配: abs(slider_y - text_y) < 200
+   - 返回 attr(slider, 'text') 或 attr(slider, 'originalText')
+3. set_slider(layout, 目标文本, value):
+   - value: 0-100 百分比
+   - target_x = slider_left + (slider_right - slider_left) * value / 100
+   - click_at(target_x, slider_center_y)
+4. dump → 验证 slider text 属性变化
+```
+
+**关键**: Slider 的值在 `text`/`originalText` 属性中，**不是** `value`！
+**验证**: 重新 dump 读 `text` 属性
+
+#### 模式 E: 文本输入弹窗
+
+```
+1. 导航到目标页面
+2. click_by_text(layout, 目标项文本, 2.5) → 弹出对话框
+3. dump_layout() → 弹窗 layout
+4. find_components(layout, type=='TextInput') → 找输入框
+5. 获取 TextInput center 坐标
+6. 输入文本 (两种方式):
+   方式1 (推荐, 用于空输入框):
+     click_at(center) → hdc_shell('uitest', 'uiInput', 'text', 新文本)
+   方式2 (用于已有内容的输入框, 替换):
+     input_text(center_x, center_y, 新文本)  # 长按→全选→输入
+7. dump_layout()
+8. click_by_text(layout, '确定', 2.0) → 确认
+9. dump → 验证右侧文本是否更新
+```
+
+**适用**: 热点名称、热点密码、WiFi 密码
+**关键**: 
+- 弹窗内 TextInput 可直接用 `uitest uiInput text` 输入（方式1），无需长按全选
+- `input_text()`（方式2）用于需要替换已有内容的场景（长按→全选→输入）
+- 确认按钮通常是 "确定" 或 "连接"
+
+#### 模式 F: 确认弹窗处理
+
+```
+1. 执行 toggle 操作 (模式 A/B/C)
+2. time.sleep(1) → dump_layout()
+3. 检查弹窗: click_by_text(layout, 确认按钮文本, 2.0)
+4. 若点击成功 (弹窗存在): time.sleep(1) → dump_layout()
+5. 验证最终状态
+```
+
+**已知确认弹窗**:
+
+| 设置项 | 弹窗标题 | 确认按钮 | 取消按钮 |
+|--------|---------|---------|---------|
+| WLAN 下自动下载 (关闭) | "关闭 WLAN 下自动下载" | "关闭" | "取消" |
+
+**处理逻辑**: toggle 后 dump，尝试 `click_by_text(layout, 确认按钮)`。无弹窗时返回 False（正常继续），有弹窗时点击确认。
+
+#### 模式 G: Radio 选择
+
+```
+1. 导航到含 Radio 的页面（可能多级）
+2. (可选) 检测双卡: find_by_text(layout, '卡 1') and '卡 2'
+3. (可选) 切换 tab: click_by_text(layout, '卡 1', 1.5) → dump
+4. find_components(layout, type=='Radio') → 所有 Radio
+5. 遍历 Radio:
+   - attr(radio, 'checked') == 'true' → 当前选中
+   - get_text(radio) 含 "(默认)" → 默认选项
+6. 点击目标 Radio: click_at(radio_center)
+7. dump → 验证 checked=true
+```
+
+**适用**: 来电铃声、信息铃声
+**双卡处理**: 有 "卡 1"/"卡 2" tab 时需分别操作
+**默认标记**: 默认铃声 Text 含 "(默认)" 后缀
+
+#### 模式 H: MenuItem 选择器
+
+```
+1. 导航到目标页面
+2. click_by_text(layout, 触发文本, 1.5) → 弹出选择器面板
+3. time.sleep(1.5) → dump_layout()
+4. find_components(layout, type=='MenuItem') → 所有选项
+5. 遍历找目标: if 目标文本 in get_text(item)
+6. click_at(item_center) → 选中, 面板自动关闭
+7. (无需点确定)
+```
+
+**适用**: 休眠时间、显示模式、屏幕刷新率、声音模式
+**关键**: 选项类型是 `MenuItem`，**不是** `Text`！
+**取消选择器**: `go_back()` 或点击面板外区域
+
+#### 模式 I: 自动动作（点击即完成）
+
+```
+1. 导航到目标页面
+2. 滑动查找目标项
+3. click_by_text(layout, 目标文本) → 系统自动处理 (无弹窗)
+4. time.sleep(5) → dump_layout()
+5. 验证: 检查目标项旁是否出现成功状态文本
+```
+
+**适用**: WiFi 已保存网络连接（点击→自动连接→验证"已连接"）
+**关键**: 点击后无弹窗无 TextInput，不需要额外操作，只需等待+验证
+**与模式 E 的区别**: 模式 E 有弹窗需输入，模式 I 无弹窗自动完成
+
+#### 模式 J: 连接+配对弹窗（蓝牙）
+
+```
+1. 导航到蓝牙页面, 确保蓝牙已开启
+2. 等待设备列表加载 (5s + dump)
+3. 滑动查找目标设备
+4. 检查是否已连接 (坐标匹配 '已连接' 文本)
+5. 点击设备 → 触发配对
+6. 轮询处理弹窗 (最多 10 次, 每次 1s):
+   - find_button(layout, '配对') → 点击
+   - find_button(layout, '确定') / '知道了' → 点击 (错误提示)
+7. 轮询等待连接 (最多 15 次, 每次 2s):
+   - 检查设备旁 '已连接' 文本
+   - 处理任何弹窗
+```
+
+**关键**: 
+- 用 `find_button()` 而非 `find_by_text()` 找"配对"按钮（避免匹配"已配对设备"）
+- `find_button()` 排除含"设备"且长度>5的文本
+- 配对弹窗可能延迟出现，需轮询
+
+#### 模式 K: 入口存在性检查
+
+```
+1. navigate_to_page(入口, scroll)
+2. 滑动查找目标项 (最多 scroll+1 屏):
+   - find_by_text(layout, target) → 找到=True
+   - swipe_up() → 下一屏
+3. 返回: 入口存在 → True, 不存在 → False
+```
+
+**适用**: 开发者模式（"开发者选项"入口可见=已开启）
+**语义**: "存在即开启"，不需要读 Toggle 状态
+
+#### 模式 L: button_selected 双选按钮
+
+```
+1. 导航到目标页面（可能多级）
+2. find_by_text_nearest(layout, 标签文本) → 找左侧标签
+3. find_buttons(layout) → 找所有 Button
+4. 匹配: abs(btn_y - label_y) < 80 且 btn_x > label_x (右侧)
+5. 检查 attr(btn, 'selected') == 'true' → 当前选中
+6. 找 Button 内嵌 Text: 在 btn bounds 范围内找 Text 组件
+7. 返回 selected=true 的 Button 内 Text 内容
+```
+
+**适用**: 默认数据卡（"默认移动数据" → "卡 1"/"卡 2"）
+**关键**: Button 的 `text` 属性为空，实际文本在内嵌 `Text` 子组件中
+
+---
+
+### 10.3 弹窗类型与处理
+
+#### 弹窗 1: 确认对话框
+
+**结构**: 标题 Text + 描述 Text + "取消" Button + 确认 Button
+**处理**: `click_by_text(layout, 确认按钮文本, 2.0)`
+**已知实例**:
+
+| 设置项 | 确认按钮 | 触发条件 |
+|--------|---------|---------|
+| WLAN 下自动下载 | "关闭" | 关闭时 |
+| 恢复出厂设置 | "确定" | 高危！脚本应默认取消 |
+| 关闭开发者模式 | "确定" | 关闭时 |
+| 取消蓝牙配对 | "确定" | 确认取消 |
+
+#### 弹窗 2: 配对确认对话框（蓝牙）
+
+**结构**: "与 xxx 配对?" + PIN 码 + "配对" / "取消" Button
+**处理**: `find_button(layout, '配对')` → `click_at(center)`
+**关键**: 用 `find_button()` 不用 `find_by_text()`，避免匹配"已配对设备"
+
+#### 弹窗 3: 提示框（信息）
+
+**结构**: 错误/提示 Text + "确定" / "知道了" Button
+**处理**: 遍历 `['确定', '知道了']` 用 `find_button()` 查找
+**已知实例**: 蓝牙配对失败、配对超时
+
+#### 弹窗 4: 文本输入对话框
+
+**结构**: 标题 Text + TextInput + "确定" / "取消" Button
+**处理**:
 ```python
-# Text 组件通常 clickable=false，需找父级 Row
-# 策略: 找所有 clickable=true 且 bounds 包含目标文本中心点的组件
-# 选面积最小的（最精确的）
+inputs = find_components(layout, lambda c: attr(c, 'type') == 'TextInput')
+center = parse_bounds(attr(inputs[0], 'bounds'))
+click_at(center[0], center[1], 0.5)
+hdc_shell('uitest', 'uiInput', 'text', 新文本)
+click_by_text(layout, '确定', 2.0)
+```
+**已知实例**: 热点名称、热点密码、WiFi 密码
+
+#### 弹窗 5: WiFi 连接弹窗（密码输入）
+
+**结构**: 
+- 标题: WiFi 名称
+- TextInput: hint="密码"
+- "隐私" / "使用随机 MAC" 选项
+- "高级选项" 可展开
+- "连接" 按钮 (Text in Button, clickable=false)
+- "安全键盘" 标识
+
+**处理**:
+```python
+# 找 TextInput
+ti = find_components(layout, lambda c: attr(c, 'type') == 'TextInput')[0]
+center = parse_bounds(attr(ti, 'bounds'))
+click_at(center[0], center[1], 0.5)
+hdc_shell('uitest', 'uiInput', 'text', password)
+time.sleep(1)
+click_by_text(layout, '连接', 5.0)  # "连接" Text 在 Button 内
 ```
 
-### 6.4 页面加载等待
+**WiFi 点击后的三种分支**:
+
+| 场景 | 页面特征 | 处理 |
+|------|---------|------|
+| 已连接 | 有"断开连接"文本 | 返回已连接 |
+| 已保存/开放网络 | 无 TextInput, 无弹窗 | 等待自动连接 (模式 I) |
+| 新加密网络 | 有 TextInput (hint=密码) | 输入密码+点连接 (模式 E) |
+
+---
+
+### 10.4 验证方法速查
+
+| 操作类型 | 验证方法 | 等待时间 | 代码 |
+|---------|---------|---------|------|
+| toggle_row 切换 | 重新 dump 读 `checked` | 1s | `read_status_toggle_row(new_layout, target)` |
+| button_card 切换 | 重新 dump 读按钮文本 | 1s | `read_status_button_card(new_layout, target)` |
+| text_value 切换 | 返回列表页读右侧文本 | 1s + go_back | `read_status_text_value(new_layout, target)` |
+| slider 设值 | 重新 dump 读 `text` 属性 | 1s | `read_status_slider(new_layout, target)` |
+| Radio 选择 | 重新 dump 读 `checked=true` | 1s | `find_components(..., type=='Radio')` |
+| MenuItem 选择 | 面板自动关闭, 读右侧文本 | 1.5s | `read_text_value_raw(new_layout, target)` |
+| 文本输入 | 读右侧文本是否更新 | 1s | `read_text_value_raw(new_layout, target)` |
+| WiFi 连接 | 检查 SSID 旁"已连接" | 5s | 坐标匹配 "已连接" Text |
+| 蓝牙连接 | 检查设备旁"已连接" | 2s×15次 | 轮询坐标匹配 |
+| 入口存在性 | `find_by_text` 是否找到 | 即时 | `find_by_text(layout, target)` |
+| button_selected | 读 `selected=true` 的 Button | 即时 | 遍历 Button 检查 `selected` |
+
+**连接状态验证通用方法**:
+```python
+def verify_connected(layout, target_name):
+    """检查目标名称旁是否有'已连接'文本"""
+    comps = find_by_text_nearest(layout, target_name)
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center: continue
+        for t in all_texts:
+            tc = parse_bounds(attr(t, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 100 and tc[0] > center[0] - 50:
+                if '已连接' in get_text(t):
+                    return True
+    return False
+```
+
+---
+
+### 10.5 坐标匹配阈值速查
+
+不同控件形态使用不同的坐标匹配阈值来判断组件关联（如 Text 与 Toggle 是否在同一行）:
+
+| 形态 | y 差阈值 | x 差阈值 | 说明 |
+|------|---------|---------|------|
+| toggle_row | < 80px | < 1200px | 同行 Toggle，x 范围宽 |
+| button_card | 20-300px | 无限制 | 按钮在卡片下方，不能太近 |
+| text_value (读状态) | < 60px | > 50px (右侧) | 右侧同行文本 |
+| text_value (连接验证) | < 100px | > -50px | 连接状态文本 |
+| slider_row | < 200px | 无限制 | Slider 可能在 Text 下方 |
+| button_selected | < 80px | > 0 (右侧) | 右侧 Button |
+
+---
+
+### 10.6 避坑清单
+
+| # | 陷阱 | 原因 | 解决方案 | 影响函数 |
+|---|------|------|---------|---------|
+| 1 | 搜索"星闪"命中标题"星闪和蓝牙" | `find_by_text` 子串匹配 | 用 `find_by_text_nearest()` 按长度差排序 | 所有 `read_status_*`/`click_by_text` |
+| 2 | 点击 Text 无反应 | Text `clickable=false` | `click_by_text()` 自动找可点击父级 | `click_by_text` |
+| 3 | `slider.value` 读不到值 | 值在 `text`/`originalText` 属性 | 用 `attr(sl, 'text', attr(sl, 'originalText', ''))` | `read_status_slider` |
+| 4 | 选择器选项找不到 | 选项类型是 `MenuItem` 不是 `Text` | `find_components(..., type=='MenuItem')` | — |
+| 5 | `comp.get('text')` 返回 None | 属性在 `attributes` 字典中 | 用 `attr(node, key)` 函数 | 所有属性读取 |
+| 6 | 返回键无效 | 用了 `systemInput` 命令 | `uitest uiInput keyEvent Back` | `go_back` |
+| 7 | `find_by_text('配对')` 匹配"已配对设备" | 子串匹配 | 用 `find_button()` 排除含"设备"且长度>5的文本 | 蓝牙配对 |
+| 8 | 电子书模式返回 `unknown(描述)` | 描述文本在状态文本之前 | `read_status_text_value` 遇非状态文本时 `continue` 跳过 | `read_status_text_value` |
+| 9 | 蓝牙设备列表未加载 | 扫描需要时间 | 等待 5s + dump，轮询最多 10 次 | `_open_bluetooth_page` |
+| 10 | WiFi 密码框已有内容 | `inputText` 在光标处插入 | 用 `input_text()` (长按→全选→输入) 或先清空 | `input_text` |
+| 11 | `uitest uiInput inputText` 不清空 | 在光标处插入，不替换 | 用 `uitest uiInput text`（替换模式）或长按全选后输入 | `input_text` |
+| 12 | `HDC` 变量为 None | `from hdc_utils import *` 导入时为 None | 用 `hdc_shell()` 函数（引用模块级变量） | `hdc_shell` |
+| 13 | 搜索结果文本带空格 | 输入"WLAN下自动下载"但结果是"WLAN 下自动下载" | `result_text` 用搜索结果实际文本 | `search_setting` |
+| 14 | WiFi 已保存网络点击无弹窗 | 系统自动连接，不弹密码框 | 检查无 TextInput 后直接等待验证（模式 I） | `connect_wlan` |
+| 15 | PowerShell 中文乱码 | GBK 编码 | `sys.stdout.reconfigure(encoding='utf-8', errors='replace')` | CLI 脚本 |
+| 16 | `navigate_to_page` 用 `scroll=` 关键字 | 参数名是 `scroll_screens` | 用位置参数: `navigate_to_page('入口', 4)` | `navigate_to_page` |
+
+---
+
+### 10.7 等待时间标准
 
 | 场景 | 等待时间 | 原因 |
 |------|---------|------|
-| `aa start` 启动应用 | 3s | 应用冷启动 |
-| 点击进入子页面 | 2.5s | 页面跳转动画 |
-| `dumpLayout` 后 | 1s | 确保文件写入完成 |
-| 蓝牙设备列表加载 | 5s | 扫描需要时间 |
-| 滑动后 | 2s | 列表刷新 |
-| 点击配对后 | 10s | 等待配对弹窗出现 |
-| 等待连接完成 | 30s | 蓝牙连接/配对需要时间 |
+| `aa start` 冷启动 | 3s | 应用启动 |
+| 点击进入子页面 | 2.5s (NAV_WAIT) | 页面跳转动画 |
+| `dumpLayout` 后 | 1s (DUMP_WAIT) | 文件写入 |
+| 滑动后 | 1.5-2s | 列表刷新 |
+| toggle 操作后 | 1s | 状态切换 |
+| 蓝牙设备列表加载 | 5s | 扫描 |
+| 蓝牙配对弹窗轮询 | 1s × 10次 | 弹窗延迟 |
+| 蓝牙连接完成轮询 | 2s × 15次 | 连接耗时 |
+| 搜索输入后 | 3s | 搜索结果加载 |
+| WiFi 连接 | 5s | 网络连接 |
+| WiFi 弹窗确认后 | 1s | 弹窗关闭 |
+
+---
+
+### 10.8 文本输入技术
+
+HarmonyOS `uitest` 提供两种文本输入命令:
+
+| 命令 | 行为 | 适用场景 |
+|------|------|---------|
+| `uitest uiInput text <文本>` | **替换**当前选中内容，无选中则插入 | 空输入框、已全选的输入框 |
+| `uitest uiInput inputText <文本>` | 在光标处**插入**，不清空 | 不推荐（容易追加而非替换） |
+
+**推荐流程**:
+
+1. **空输入框** (如刚弹出的密码框): 点击激活 → `uitest uiInput text <文本>`
+2. **已有内容的输入框** (如修改热点名称): `input_text(x, y, 文本)` = 长按 → "全选" → `uitest uiInput text <文本>`
+
+**长按全选流程** (`input_text` 函数):
+```
+1. uitest uiInput longClick <x> <y>  → 显示上下文菜单
+2. time.sleep(1.5)
+3. dump_layout → click_by_text('全选')  → 选中全部文本
+4. uitest uiInput text <新文本>  → 替换选中文本
+```
+
+**Ctrl+A (keyEvent 113 29) 在 HarmonyOS 中无效**，必须用长按→全选方式。
+
+---
+
+### 10.9 组件搜索策略
+
+| 搜索需求 | 推荐函数 | 说明 |
+|---------|---------|------|
+| 按文本找组件 | `find_by_text_nearest` | 按长度差排序，避免子串碰撞 |
+| 按文本找（无碰撞风险） | `find_by_text` | 子串匹配 |
+| 找所有 Toggle | `find_toggles` | type 含 toggle/switch |
+| 找所有 Button | `find_buttons` | type == Button |
+| 找所有 Slider | `find_sliders` | type == slider |
+| 找所有 MenuItem | `find_menu_items` | type == MenuItem |
+| 找所有 Radio | `find_components(..., type=='Radio')` | — |
+| 找所有 TextInput | `find_components(..., type=='TextInput')` | — |
+| 找所有 Text | `find_components(..., type=='Text')` | — |
+| 自定义条件 | `find_components(node, predicate)` | 递归搜索 |
+
+**属性读取**: 统一用 `attr(node, key, default='')` 函数，不要用 `node.get('text')`
+**文本读取**: 统一用 `get_text(node)` 函数（内部调用 `attr(node, 'text')` 或 `attr(node, 'originalText')`）
+
+---
+
+### 10.10 脚本生成检查清单
+
+生成新脚本前，确认以下信息是否齐全:
+
+- [ ] **导航路径**: 入口文本 + 滑动屏数（查第三章 + 第八章）
+- [ ] **控件形态**: toggle_row / button_card / text_value / slider_row / nav_item / button_selected（查第六章）
+- [ ] **交互模式**: 匹配本章 10.2 的哪个模式？
+- [ ] **弹窗**: 操作是否触发弹窗？（查 10.3）
+- [ ] **验证方法**: 操作后如何验证？（查 10.4）
+- [ ] **已知陷阱**: 目标文本是否有子串碰撞风险？（查 10.6）
+- [ ] **安全认证**: 是否需要前置认证？（查第九章）
+- [ ] **等待时间**: 是否需要额外等待？（查 10.7）
+
+**缺失信息时的处理**:
+1. 先查本章是否有通用模式可套用
+2. 若模式已知但页面结构未知 → 做针对性探索（只探索缺失部分）
+3. 若模式未知 → 探索完整流程并补充到本章
 
 ---
 

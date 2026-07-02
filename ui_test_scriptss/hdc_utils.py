@@ -579,3 +579,40 @@ def find_target_with_scroll(layout, target_text, control_form,
         if status is not None:
             return layout, status
     return layout, None
+
+
+def search_setting(keyword, result_text=None):
+    """
+    通过设置首页搜索框搜索并跳转到目标设置页
+
+    适用于无法通过常规导航到达、或导航层级过深的设置项。
+    流程: 重启设置 → 点搜索框 → 输入关键词 → 点搜索结果 → 返回目标页
+
+    Args:
+        keyword: 搜索关键词 (输入到搜索框)
+        result_text: 要点击的搜索结果文本 (默认用 keyword)
+                     注意: 搜索结果文本可能与输入不同 (如带空格)
+
+    Returns:
+        目标页面 layout (dict) 或 None
+    """
+    restart_settings()
+    layout = dump_layout()
+    # 点击搜索框 (首页固定位置)
+    click_at(660, 387, 2.0)
+    layout = dump_layout()
+    # 找 TextInput 并点击激活
+    for c in find_components(layout, lambda c: attr(c, 'type') == 'TextInput'):
+        center = parse_bounds(attr(c, 'bounds'))
+        if center:
+            click_at(center[0], center[1], 0.5)
+            break
+    # 输入搜索文本
+    hdc_shell('uitest', 'uiInput', 'text', keyword)
+    time.sleep(3)
+    # 点击搜索结果
+    layout = dump_layout()
+    target = result_text or keyword
+    if click_by_text(layout, target, 3.0):
+        return dump_layout()
+    return None
