@@ -151,6 +151,8 @@ def set_zoom_gesture(desired):
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
 | 锁屏方式 | `query_lock_screen_method()` | —（安全验证，不可自动化） |
+| 指纹录入状态 | `query_fingerprint()` | —（录入需锁屏密码+物理传感器） |
+| 隐私空间 | `query_privacy_space()` | —（开启/关闭需安全认证） |
 
 ### 第 4 步：生成 CLI 脚本（薄壳）
 
@@ -248,6 +250,8 @@ ui_test_scriptss/
 ├── storage_manager.py              存储空间使用率/已用/总大小/应用占用查询
 ├── usb_debug_manager.py            USB调试开关查询与设置
 ├── developer_mode_manager.py       开发者模式查询与开关（点击版本号7次/关闭总开关）
+├── fingerprint_manager.py          指纹录入状态查询
+├── privacy_space_manager.py        隐私空间状态查询
 ├── 脚本生成失败说明.md             无法生成的功能及原因
 ├── HarmonyOS设置功能知识库.md       知识库 v5 (15章, 1527行)
 └── SKILL.md                        本文件

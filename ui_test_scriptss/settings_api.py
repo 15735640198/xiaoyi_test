@@ -1637,3 +1637,71 @@ def set_developer_mode(desired):
         time.sleep(1)
         new_status = query_developer_mode()
         return (new_status == 'off'), new_status
+
+
+# ── 指纹状态查询 ──
+
+def query_fingerprint():
+    """
+    查询指纹录入状态 → 'enrolled' | 'not_enrolled' | 'unknown' | None(未找到)
+
+    生物识别和密码 > 指纹, 列表页指纹卡片内含"未录入"/"已录入"文本。
+    注意: 仅支持查询，录入指纹需先设置锁屏密码 + 物理传感器交互，不可自动化。
+    """
+    layout = navigate_to_page('生物识别和密码', 4)
+    if not layout:
+        return None
+    # 指纹和状态文本是上下排列（非左右），用 Column 文本判断
+    # Column text 格式: "指纹, 未录入" 或 "指纹, 已录入"
+    for c in find_components(layout, lambda c: '指纹' in attr(c, 'text', '')):
+        txt = attr(c, 'text', '')
+        if '已录入' in txt:
+            return 'enrolled'
+        if '未录入' in txt:
+            return 'not_enrolled'
+    # 备用: 查找含"录入"的 Text，检查是否在指纹附近
+    fingerprint_comps = find_by_text_nearest(layout, '指纹')
+    if fingerprint_comps:
+        fb = parse_bounds(attr(fingerprint_comps[0], 'bounds'))
+        if fb:
+            for c in find_components(layout, lambda c: '录入' in attr(c, 'text', '')):
+                cb = parse_bounds(attr(c, 'bounds', ''))
+                if cb and abs(cb[1] - fb[1]) < 100 and abs(cb[0] - fb[0]) < 200:
+                    if '已录入' in attr(c, 'text', ''):
+                        return 'enrolled'
+                    if '未录入' in attr(c, 'text', ''):
+                        return 'not_enrolled'
+    return 'unknown'
+
+
+# ── 隐私空间状态查询 ──
+
+def query_privacy_space():
+    """
+    查询隐私空间状态 → 'not_setup' | 'setup' | 'unknown' | None(未找到)
+
+    隐私和安全 > 隐私空间, 子页面有"开启"按钮=未设置，无"开启"按钮=已设置。
+    注意: 仅支持查询，开启/关闭隐私空间需设置单独锁屏密码（安全认证），不可自动化。
+    """
+    layout = navigate_to_page('隐私和安全', 4)
+    if not layout:
+        return None
+    # 滑动查找"隐私空间"
+    for i in range(6):
+        comps = find_components(layout, lambda c: attr(c, 'text') == '隐私空间')
+        if comps:
+            b = parse_bounds(attr(comps[0], 'bounds'))
+            if b and b[1] < 1800:
+                break
+        swipe_up()
+        layout = dump_layout()
+    if not click_by_text(layout, '隐私空间', 3.0):
+        return None
+    time.sleep(2)
+    layout = dump_layout()
+    # 子页面有"开启"按钮 = 未设置
+    open_btns = find_components(layout, lambda c: attr(c, 'text') == '开启' and attr(c, 'type') == 'Button')
+    if open_btns:
+        return 'not_setup'
+    # 无"开启"按钮 = 已设置
+    return 'setup'
