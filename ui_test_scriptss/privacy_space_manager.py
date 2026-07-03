@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
 """
-HarmonyOS 隐私空间状态查询脚本（CLI 调度器）
+HarmonyOS 隐私空间管理脚本（CLI 调度器）
 
-API: settings_api.query_privacy_space
+API: settings_api.query_privacy_space / set_privacy_space
 
 用法:
-  python privacy_space_manager.py --mode query
-
-注意: 仅支持查询隐私空间是否已设置。
-      开启/关闭隐私空间需设置单独锁屏密码（安全认证），无法通过脚本自动化。
+  python privacy_space_manager.py --mode query                                          # 查询隐私空间状态
+  python privacy_space_manager.py --mode setup --main-pwd 233333 --space-pwd 244444     # 开启隐私空间
 """
 
 import sys
 import argparse
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 from hdc_utils import find_hdc, check_device
-from settings_api import query_privacy_space
+from settings_api import query_privacy_space, set_privacy_space
 
 
 def main():
-    parser = argparse.ArgumentParser(description='HarmonyOS 隐私空间状态查询')
-    parser.add_argument('--mode', required=True, choices=['query'],
-                        help='query(查询隐私空间状态)')
+    parser = argparse.ArgumentParser(description='HarmonyOS 隐私空间管理')
+    parser.add_argument('--mode', required=True,
+                        choices=['query', 'setup'],
+                        help='query(查询状态) / setup(开启隐私空间)')
+    parser.add_argument('--main-pwd', default=None,
+                        help='主空间锁屏密码（mode=setup 时必须）')
+    parser.add_argument('--space-pwd', default=None,
+                        help='隐私空间密码，必须与主空间密码不同（mode=setup 时必须）')
     args = parser.parse_args()
 
-    print("=" * 50)
-    print("  HarmonyOS 隐私空间状态查询")
-    print("=" * 50)
+    print("=" * 55)
+    print("  HarmonyOS 隐私空间管理")
+    print("=" * 55)
 
     find_hdc()
     device = check_device()
@@ -41,8 +44,15 @@ def main():
         }
         status_str = status_map.get(status, str(status))
         print(f"\n  >>> 隐私空间: {status_str} <<<")
-        if status == 'not_setup':
-            print("  提示: 开启隐私空间需设置单独锁屏密码，请在 设置 > 隐私和安全 > 隐私空间 中手动开启")
+    elif args.mode == 'setup':
+        if not args.main_pwd or not args.space_pwd:
+            print("\n  >>> 错误: mode=setup 需要 --main-pwd 和 --space-pwd 参数 <<<")
+            sys.exit(1)
+        success, msg = set_privacy_space(args.main_pwd, args.space_pwd)
+        if success:
+            print(f"\n  >>> {msg} <<<")
+        else:
+            print(f"\n  >>> {msg} <<<")
 
 
 if __name__ == '__main__':

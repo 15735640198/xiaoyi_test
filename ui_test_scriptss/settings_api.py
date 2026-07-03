@@ -1646,7 +1646,7 @@ def query_fingerprint():
     查询指纹录入状态 → 'enrolled' | 'not_enrolled' | 'unknown' | None(未找到)
 
     生物识别和密码 > 指纹, 列表页指纹卡片内含"未录入"/"已录入"文本。
-    注意: 仅支持查询，录入指纹需先设置锁屏密码 + 物理传感器交互，不可自动化。
+    注意: 仅支持查询，录入指纹需物理传感器交互，不可自动化。
     """
     layout = navigate_to_page('生物识别和密码', 4)
     if not layout:
@@ -1674,14 +1674,71 @@ def query_fingerprint():
     return 'unknown'
 
 
-# ── 隐私空间状态查询 ──
+# ── 锁屏密码设置 ──
+
+def _input_password_to_textinput(layout, password):
+    """在当前页面找到 TextInput，点击激活并输入密码，返回新 layout"""
+    for c in find_components(layout, lambda c: attr(c, 'type') == 'TextInput'):
+        center = parse_bounds(attr(c, 'bounds'))
+        if center:
+            click_at(center[0], center[1], 1.0)
+            hdc_shell('uitest', 'uiInput', 'text', password)
+            time.sleep(2)
+            return dump_layout()
+    return None
+
+
+def set_lock_screen_password(password):
+    """
+    设置锁屏密码 → (success, message)
+
+    生物识别和密码 > 指纹, 若未设置锁屏密码则进入密码设置页。
+    流程: 输入密码 → 确认密码 → 完成。
+
+    Args:
+        password: 锁屏密码（数字字符串，如 '233333'）
+    """
+    layout = navigate_to_page('生物识别和密码', 4)
+    if not layout:
+        return False, '未找到生物识别和密码入口'
+    # 点击"指纹"进入（未设密码时跳转到密码设置页）
+    if not click_by_text(layout, '指纹', 3.0):
+        return False, '未找到指纹入口'
+    time.sleep(2)
+    layout = dump_layout()
+    # 检查是否在密码设置页（标题含"设置锁屏"或"密码"）
+    is_pwd_page = False
+    for c in find_components(layout, lambda c: '锁屏' in attr(c, 'text', '') or '设置' in attr(c, 'text', '')):
+        if '密码' in attr(c, 'text', ''):
+            is_pwd_page = True
+            break
+    if not is_pwd_page:
+        # 可能已有锁屏密码，不在密码设置页
+        return False, '锁屏密码已设置（无法通过脚本修改，需手动操作）'
+    # 关闭弹窗（如有"知道了"）
+    click_by_text(layout, '知道了', 1.0)
+    time.sleep(1)
+    layout = dump_layout()
+    # 第一次输入密码
+    layout = _input_password_to_textinput(layout, password)
+    if not layout:
+        return False, '未找到密码输入框'
+    # 检查是否需要再次输入
+    if find_components(layout, lambda c: '再次' in attr(c, 'text', '')):
+        layout = _input_password_to_textinput(layout, password)
+        if not layout:
+            return False, '确认密码失败'
+    time.sleep(2)
+    return True, '锁屏密码设置成功'
+
+
+# ── 隐私空间 ──
 
 def query_privacy_space():
     """
     查询隐私空间状态 → 'not_setup' | 'setup' | 'unknown' | None(未找到)
 
     隐私和安全 > 隐私空间, 子页面有"开启"按钮=未设置，无"开启"按钮=已设置。
-    注意: 仅支持查询，开启/关闭隐私空间需设置单独锁屏密码（安全认证），不可自动化。
     """
     layout = navigate_to_page('隐私和安全', 4)
     if not layout:
@@ -1705,3 +1762,71 @@ def query_privacy_space():
         return 'not_setup'
     # 无"开启"按钮 = 已设置
     return 'setup'
+
+
+def set_privacy_space(main_password, space_password):
+    """
+    开启隐私空间 → (success, message)
+
+    隐私和安全 > 隐私空间 > 开启。
+    流程: 确认主空间密码 → 设置隐私空间密码（须与主空间不同）→ 确认密码 → 加载完成。
+
+    Args:
+        main_password: 主空间锁屏密码（如 '233333'）
+        space_password: 隐私空间密码，必须与主空间密码不同（如 '244444'）
+    """
+    if main_password == space_password:
+        return False, '隐私空间密码不能与主空间密码相同'
+
+    layout = navigate_to_page('隐私和安全', 4)
+    if not layout:
+        return False, '未找到隐私和安全入口'
+    # 滑动查找隐私空间
+    for i in range(6):
+        comps = find_components(layout, lambda c: attr(c, 'text') == '隐私空间')
+        if comps:
+            b = parse_bounds(attr(comps[0], 'bounds'))
+            if b and b[1] < 1800:
+                break
+        swipe_up()
+        layout = dump_layout()
+    if not click_by_text(layout, '隐私空间', 3.0):
+        return False, '未找到隐私空间入口'
+    time.sleep(2)
+    layout = dump_layout()
+    # 点击"开启"
+    open_btns = find_components(layout, lambda c: attr(c, 'text') == '开启' and attr(c, 'type') == 'Button')
+    if not open_btns:
+        return False, '隐私空间已设置（无开启按钮）'
+    center = parse_bounds(attr(open_btns[0], 'bounds'))
+    if center:
+        click_at(center[0], center[1], 3.0)
+    time.sleep(2)
+    # 第一步: 确认主空间密码
+    layout = dump_layout()
+    if not find_components(layout, lambda c: '主空间' in attr(c, 'text', '')):
+        return False, '未出现主空间密码确认页'
+    layout = _input_password_to_textinput(layout, main_password)
+    if not layout:
+        return False, '主空间密码输入失败'
+    # 第二步: 设置隐私空间密码
+    if not find_components(layout, lambda c: '隐私空间密码' in attr(c, 'text', '')):
+        return False, '未出现隐私空间密码设置页（主空间密码可能错误）'
+    layout = _input_password_to_textinput(layout, space_password)
+    if not layout:
+        return False, '隐私空间密码输入失败'
+    # 检查是否有错误提示（如密码重复）
+    if find_components(layout, lambda c: '重复' in attr(c, 'text', '') or '重新输入' in attr(c, 'text', '')):
+        return False, '密码不符合要求（可能与主空间重复）'
+    # 第三步: 确认隐私空间密码
+    if find_components(layout, lambda c: '再次' in attr(c, 'text', '')):
+        layout = _input_password_to_textinput(layout, space_password)
+        if not layout:
+            return False, '确认密码失败'
+    # 等待加载完成
+    time.sleep(3)
+    layout = dump_layout()
+    if find_components(layout, lambda c: '加载' in attr(c, 'text', '')):
+        time.sleep(3)
+        layout = dump_layout()
+    return True, '隐私空间开启成功'

@@ -151,8 +151,9 @@ def set_zoom_gesture(desired):
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
 | 锁屏方式 | `query_lock_screen_method()` | —（安全验证，不可自动化） |
-| 指纹录入状态 | `query_fingerprint()` | —（录入需锁屏密码+物理传感器） |
-| 隐私空间 | `query_privacy_space()` | —（开启/关闭需安全认证） |
+| 锁屏密码 | — | `set_lock_screen_password(password)` |
+| 指纹录入状态 | `query_fingerprint()` | —（录入需物理传感器） |
+| 隐私空间 | `query_privacy_space()` | `set_privacy_space(main_pwd, space_pwd)` |
 
 ### 第 4 步：生成 CLI 脚本（薄壳）
 
