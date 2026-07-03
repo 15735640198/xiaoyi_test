@@ -33,6 +33,7 @@ NAV_WAIT = 2.5
 DUMP_WAIT = 1.0
 
 HDC = None  # hdc 可执行文件路径，find_hdc() 后赋值
+_screen_size = None  # 屏幕尺寸 (width, height)，get_screen_size() 后赋值
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -106,6 +107,22 @@ def dump_layout():
     run_cmd([HDC, 'file', 'recv', remote, local], timeout=15)
     with open(local, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+
+def get_screen_size():
+    """获取屏幕尺寸 (width, height)，首次调用时从 dumpLayout 根节点获取并缓存"""
+    global _screen_size
+    if _screen_size:
+        return _screen_size
+    layout = dump_layout()
+    root_bounds = attr(layout, 'bounds')
+    if root_bounds:
+        fb = parse_full_bounds(root_bounds)
+        if fb and fb[2] > 0 and fb[3] > 0:
+            _screen_size = (fb[2], fb[3])
+            return _screen_size
+    _screen_size = (1260, 2772)
+    return _screen_size
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -253,13 +270,17 @@ def click_by_text(layout, text, wait=NAV_WAIT):
 
 def swipe_up(wait=1.5):
     """向上滑动（查看下方内容）"""
-    hdc_shell('uitest', 'uiInput', 'swipe', '660', '1900', '660', '600')
+    w, h = get_screen_size()
+    cx = str(w // 2)
+    hdc_shell('uitest', 'uiInput', 'swipe', cx, str(int(h * 0.85)), cx, str(int(h * 0.25)))
     time.sleep(wait)
 
 
 def swipe_down(wait=1.5):
     """向下滑动（查看上方内容）"""
-    hdc_shell('uitest', 'uiInput', 'swipe', '660', '600', '660', '1900')
+    w, h = get_screen_size()
+    cx = str(w // 2)
+    hdc_shell('uitest', 'uiInput', 'swipe', cx, str(int(h * 0.25)), cx, str(int(h * 0.85)))
     time.sleep(wait)
 
 
@@ -598,8 +619,18 @@ def search_setting(keyword, result_text=None):
     """
     restart_settings()
     layout = dump_layout()
-    # 点击搜索框 (首页固定位置)
-    click_at(660, 387, 2.0)
+    # 动态定位搜索框 (Search/SearchField 组件)
+    search_comp = None
+    for c in find_components(layout, lambda c: attr(c, 'type') in ('Search', 'SearchField')):
+        search_comp = c
+        break
+    if search_comp:
+        center = parse_bounds(attr(search_comp, 'bounds'))
+        if center:
+            click_at(center[0], center[1], 2.0)
+    else:
+        w, h = get_screen_size()
+        click_at(w // 2, int(h * 0.14), 2.0)
     layout = dump_layout()
     # 找 TextInput 并点击激活
     for c in find_components(layout, lambda c: attr(c, 'type') == 'TextInput'):

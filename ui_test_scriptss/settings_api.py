@@ -1193,3 +1193,447 @@ def query_default_input_method():
         return None
     layout = dump_layout()
     return read_text_value_raw(layout, '默认输入法')
+
+
+# ── 日期和时间（自动时区、系统时区）──
+
+def _open_date_time_page():
+    """导航到 日期和时间 设置页，返回 layout 或 None"""
+    layout = navigate_to_page('系统', 4)
+    if not layout:
+        return None
+    if not click_by_text(layout, '日期和时间', 2.5):
+        return None
+    time.sleep(1)
+    return dump_layout()
+
+
+def query_auto_timezone():
+    """
+    查询自动时区开关状态 → 'on' | 'off' | 'unknown' | None(未找到)
+
+    系统 > 日期和时间, "自动设置"行右侧 Toggle 的 checked 属性。
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return None
+    return read_status_toggle_row(layout, '自动设置')
+
+
+def set_auto_timezone(desired):
+    """
+    设置自动时区开关 → (success, new_status)
+
+    系统 > 日期和时间, "自动设置"行 Toggle。
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return False, '未找到日期和时间入口'
+    status = read_status_toggle_row(layout, '自动设置')
+    if status is None:
+        return False, '未找到自动设置开关'
+    if status == desired:
+        return True, status
+    # 点击 Toggle 切换
+    toggles = find_toggles(layout)
+    comps = find_by_text_nearest(layout, '自动设置')
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for tg in toggles:
+            tc = parse_bounds(attr(tg, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 80:
+                click_at(tc[0], tc[1], 2.0)
+                layout = dump_layout()
+                new_status = read_status_toggle_row(layout, '自动设置')
+                return (new_status == desired), new_status
+    return False, status
+
+
+def query_timezone():
+    """
+    查询系统时区 → 时区文本 (如 'GMT+08:00 中国标准时间') | None
+
+    系统 > 日期和时间, "时区"行右侧显示当前时区。
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '时区')
+
+
+def set_timezone(timezone_name):
+    """
+    设置系统时区 → (success, message)
+
+    系统 > 日期和时间 > 时区选择列表。
+    需先关闭自动时区（如开启），然后在列表中查找并点击目标时区。
+
+    Args:
+        timezone_name: 时区关键词，用于在列表中匹配
+                       (如 '中国标准时间' 或 'GMT+08:00' 或 '北京')
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return False, '未找到日期和时间入口'
+
+    # 如自动设置开启，先关闭
+    auto_status = read_status_toggle_row(layout, '自动设置')
+    if auto_status == 'on':
+        toggles = find_toggles(layout)
+        comps = find_by_text_nearest(layout, '自动设置')
+        for comp in comps:
+            center = parse_bounds(attr(comp, 'bounds'))
+            if not center:
+                continue
+            for tg in toggles:
+                tc = parse_bounds(attr(tg, 'bounds'))
+                if tc and abs(tc[1] - center[1]) < 80:
+                    click_at(tc[0], tc[1], 2.0)
+                    break
+            break
+        time.sleep(1)
+        layout = dump_layout()
+
+    # 点击"时区"行进入选择列表
+    if not click_by_text(layout, '时区', 3.0):
+        return False, '未找到时区入口'
+    time.sleep(2)
+
+    # 在时区列表中查找目标
+    layout = dump_layout()
+    for i in range(10):
+        # 查找匹配的时区项
+        matches = find_components(layout, lambda c: timezone_name in (
+            attr(c, 'text', '') + attr(c, 'originalText', '')))
+        if matches:
+            # 点击匹配项（Text 的 clickable=false，点击中心坐标即可）
+            target = matches[0]
+            center = parse_bounds(attr(target, 'bounds'))
+            if center:
+                click_at(center[0], center[1], 2.0)
+                time.sleep(1)
+                # 验证
+                hdc_shell('uitest', 'uiInput', 'keyEvent', 'Back')
+                time.sleep(1)
+                layout = dump_layout()
+                # 再次返回到日期和时间页
+                hdc_shell('uitest', 'uiInput', 'keyEvent', 'Back')
+                time.sleep(1)
+                layout = dump_layout()
+                current = read_text_value_raw(layout, '时区')
+                if current and timezone_name in current:
+                    return True, f'时区已设置为: {current}'
+                return True, f'已选择时区 (当前: {current})'
+        swipe_up(1.0)
+        layout = dump_layout()
+
+    return False, f'未找到匹配的时区: {timezone_name}'
+
+
+# ── 存储空间 ──
+
+def _open_storage_page():
+    """导航到存储设置页，返回 layout 或 None"""
+    restart_settings()
+    layout = dump_layout()
+    for i in range(8):
+        comps = find_components(layout, lambda c: attr(c, 'text') == '存储')
+        if comps:
+            b = parse_bounds(attr(comps[0], 'bounds'))
+            if b and b[1] < 1800:
+                break
+        swipe_up()
+        layout = dump_layout()
+    if not click_by_text(layout, '存储', 3.0):
+        return None
+    time.sleep(3)  # 等待存储计算完成
+    return dump_layout()
+
+
+def query_storage():
+    """
+    查询存储空间使用情况 → dict | None
+
+    返回:
+      {
+        'usage_rate': '16%',           # 使用率
+        'used': '83.02 GB',           # 已使用
+        'total': '512 GB',            # 总大小
+        'apps': [                     # 应用占用列表 (前N个)
+          {'name': '卓易通', 'size': '3.43 GB'},
+          ...
+        ]
+      }
+    """
+    layout = _open_storage_page()
+    if not layout:
+        return None
+
+    result = {'usage_rate': None, 'used': None, 'total': None, 'apps': []}
+
+    # 查找使用率百分比文本 (如 "16%")
+    for c in find_components(layout, lambda c: True):
+        txt = attr(c, 'text', '').strip()
+        if txt and txt.endswith('%') and len(txt) <= 6:
+            # 排除电池百分比 (id 含 battery)
+            cid = attr(c, 'id', '')
+            if 'battery' not in cid.lower() and 'Battery' not in cid:
+                result['usage_rate'] = txt
+                break
+
+    # 查找"已使用 X GB/Y GB"文本
+    for c in find_components(layout, lambda c: '已使用' in attr(c, 'text', '')):
+        txt = attr(c, 'text', '').strip()
+        # 解析 "已使用 83.02 GB/512 GB"
+        m = re.match(r'已使用\s*(.+?)/\s*(.+)', txt)
+        if m:
+            result['used'] = m.group(1).strip()
+            result['total'] = m.group(2).strip()
+            break
+
+    # 查找应用占用列表 (id 含 AppGroup 且含 .title)
+    app_titles = find_components(
+        layout, lambda c: 'AppGroup' in attr(c, 'id', '') and '.title' in attr(c, 'id', ''))
+    app_sizes = find_components(
+        layout, lambda c: 'AppGroup' in attr(c, 'id', '') and '.result' in attr(c, 'id', ''))
+
+    for title in app_titles:
+        tid = attr(title, 'id', '')
+        # 从 title id 提取包名: Setting.Storage.AppGroup.<package>,0.title
+        m = re.match(r'Setting\.Storage\.AppGroup\.(.+?),0\.title', tid)
+        if not m:
+            continue
+        pkg = m.group(1)
+        app_name = attr(title, 'text', '').strip()
+        # 找对应的 size (同包名)
+        for sz in app_sizes:
+            if pkg in attr(sz, 'id', ''):
+                result['apps'].append({
+                    'name': app_name,
+                    'size': attr(sz, 'text', '').strip()
+                })
+                break
+
+    return result
+
+
+# ── USB 调试 ──
+
+def _open_developer_options():
+    """导航到开发者选项页面，返回 layout 或 None"""
+    restart_settings()
+    layout = dump_layout()
+    # 滑动查找"系统"入口
+    for i in range(8):
+        comps = find_components(layout, lambda c: attr(c, 'text') == '系统')
+        if comps:
+            b = parse_bounds(attr(comps[0], 'bounds'))
+            if b and b[1] < 1800:
+                break
+        swipe_up()
+        layout = dump_layout()
+    if not click_by_text(layout, '系统', 3.0):
+        return None
+    # 滑动查找"开发者选项"
+    layout = dump_layout()
+    for i in range(6):
+        if click_by_text(layout, '开发者选项', 3.0):
+            time.sleep(2)
+            return dump_layout()
+        swipe_up()
+        layout = dump_layout()
+    return None
+
+
+def query_usb_debug():
+    """
+    查询USB调试开关状态 → 'on' | 'off' | 'unknown' | None(未找到)
+
+    系统 > 开发者选项, "USB 调试"行 Toggle (id=entry_toggle_usb_debug)。
+    """
+    layout = _open_developer_options()
+    if not layout:
+        return None
+    # 通过 id 直接查找 Toggle
+    for c in find_components(layout, lambda c: attr(c, 'id') == 'entry_toggle_usb_debug'):
+        return read_toggle_state(c)
+    # 滑动查找
+    for i in range(4):
+        swipe_up()
+        layout = dump_layout()
+        for c in find_components(layout, lambda c: attr(c, 'id') == 'entry_toggle_usb_debug'):
+            return read_toggle_state(c)
+    return None
+
+
+def set_usb_debug(desired):
+    """
+    设置USB调试开关 → (success, new_status)
+
+    系统 > 开发者选项, "USB 调试"行 Toggle。
+    开启时可能弹出确认对话框，需点击"允许"确认。
+    """
+    layout = _open_developer_options()
+    if not layout:
+        return False, '未找到开发者选项入口'
+
+    def find_usb_toggle(lay):
+        for c in find_components(lay, lambda c: attr(c, 'id') == 'entry_toggle_usb_debug'):
+            return c
+        return None
+
+    tg = find_usb_toggle(layout)
+    if not tg:
+        # 滑动查找
+        for i in range(4):
+            swipe_up()
+            layout = dump_layout()
+            tg = find_usb_toggle(layout)
+            if tg:
+                break
+    if not tg:
+        return False, '未找到USB调试开关'
+
+    current = read_toggle_state(tg)
+    if current == desired:
+        return True, current
+
+    # 点击 Toggle 切换
+    center = parse_bounds(attr(tg, 'bounds'))
+    if center:
+        click_at(center[0], center[1], 2.0)
+    else:
+        return False, current
+
+    # 检查是否有确认对话框（开启时可能弹出）
+    layout = dump_layout()
+    for btn_text in ['允许', '确定', '确认']:
+        if click_by_text(layout, btn_text, 2.0):
+            time.sleep(1)
+            break
+
+    layout = dump_layout()
+    new_status = None
+    tg2 = find_usb_toggle(layout)
+    if tg2:
+        new_status = read_toggle_state(tg2)
+    return (new_status == desired), new_status
+
+
+# ── 开发者模式（开启/关闭）──
+
+def _open_about_device():
+    """通过搜索导航到关于本机页面，返回 layout 或 None"""
+    restart_settings()
+    layout = dump_layout()
+    # 点击搜索框
+    for c in find_components(layout, lambda c: attr(c, 'type') in ('Search', 'SearchField')):
+        center = parse_bounds(attr(c, 'bounds'))
+        if center:
+            click_at(center[0], center[1], 2.0)
+            break
+    layout = dump_layout()
+    # 点击 TextInput 激活
+    for c in find_components(layout, lambda c: attr(c, 'type') == 'TextInput'):
+        center = parse_bounds(attr(c, 'bounds'))
+        if center:
+            click_at(center[0], center[1], 0.5)
+            break
+    # 输入搜索文本
+    hdc_shell('uitest', 'uiInput', 'text', '关于本机')
+    time.sleep(3)
+    # 点击搜索结果 (通过 id 定位 searchResultItem)
+    layout = dump_layout()
+    results = find_components(layout, lambda c: attr(c, 'id') == 'searchResultItem')
+    if results:
+        center = parse_bounds(attr(results[0], 'bounds'))
+        if center:
+            # 找包含此中心的最小可点击组件
+            clickables = find_components(layout, lambda c: attr(c, 'clickable') == 'true')
+            best = None
+            best_area = float('inf')
+            for c in clickables:
+                fb = parse_full_bounds(attr(c, 'bounds', ''))
+                if fb and fb[0] <= center[0] <= fb[2] and fb[1] <= center[1] <= fb[3]:
+                    area = (fb[2] - fb[0]) * (fb[3] - fb[1])
+                    if area < best_area:
+                        best_area = area
+                        best = ((fb[0] + fb[2]) // 2, (fb[1] + fb[3]) // 2)
+            target = best if best else center
+            click_at(target[0], target[1], 3.0)
+            return dump_layout()
+    return None
+
+
+def set_developer_mode(desired):
+    """
+    设置开发者模式 → (success, new_status)
+
+    开启: 关于本机 > 连续点击"HarmonyOS 版本"7 次
+    关闭: 开发者选项 > 关闭顶部 Toggle > 确认弹窗
+    """
+    current = query_developer_mode()
+    if current == desired:
+        return True, current
+
+    if desired == 'on':
+        # 导航到关于本机
+        layout = _open_about_device()
+        if not layout:
+            return False, '未找到关于本机页面'
+        # 查找 HarmonyOS 版本 行
+        version_title = None
+        for c in find_components(layout, lambda c: 'harmonyos_version' in attr(c, 'id', '').lower()):
+            if '.title' in attr(c, 'id', ''):
+                version_title = c
+                break
+        if not version_title:
+            # 滑动查找
+            for i in range(3):
+                swipe_up()
+                layout = dump_layout()
+                for c in find_components(layout, lambda c: 'harmonyos_version' in attr(c, 'id', '').lower()):
+                    if '.title' in attr(c, 'id', ''):
+                        version_title = c
+                        break
+                if version_title:
+                    break
+        if not version_title:
+            return False, '未找到版本号'
+        # 连续点击版本号 7 次
+        center = parse_bounds(attr(version_title, 'bounds'))
+        if not center:
+            return False, '无法获取版本号位置'
+        for i in range(7):
+            click_at(center[0], center[1], 0.3)
+        time.sleep(1)
+        # 验证
+        new_status = query_developer_mode()
+        return (new_status == 'on'), new_status
+
+    else:  # off
+        # 导航到开发者选项
+        layout = _open_developer_options()
+        if not layout:
+            return False, '未找到开发者选项入口'
+        # 顶部第一个 Toggle 就是开发者选项总开关
+        toggles = find_toggles(layout)
+        if not toggles:
+            return False, '未找到开发者选项开关'
+        # 第一个 Toggle (y 最小) 是总开关
+        first_tg = min(toggles, key=lambda t: (parse_bounds(attr(t, 'bounds', '')) or [0, float('inf')])[1])
+        center = parse_bounds(attr(first_tg, 'bounds'))
+        if center:
+            click_at(center[0], center[1], 2.0)
+        # 确认弹窗
+        layout = dump_layout()
+        for btn in ['确定', '关闭', '确认']:
+            if click_by_text(layout, btn, 2.0):
+                time.sleep(1)
+                break
+        # 验证: 开发者选项入口应消失
+        time.sleep(1)
+        new_status = query_developer_mode()
+        return (new_status == 'off'), new_status

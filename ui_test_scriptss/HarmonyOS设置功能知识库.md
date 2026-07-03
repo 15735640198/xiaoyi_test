@@ -559,24 +559,27 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 ### 3.15 存储
 
 - **导航路径**: 设置 > 存储
-- **入口文本**: `存储`
+- **入口文本**: `存储`（需从设置首页滑动约 2 屏，确保文本不在屏幕底部边缘再点击）
 - **滑动需求**: 4 屏
-- **子项** (44 项):
+- **页面加载**: 进入后需等待 3s（存储计算）
+- **子项**:
 
-| 子项 | 形态 | 状态/操作说明 |
-|------|------|------------|
-| 总用量 | button | "16%" 百分比 |
-| 应用 | text_value | 右侧显示大小（如"3.43 GB"） |
-| 图片 | text_value | 右侧显示大小 |
-| 视频 | text_value | 右侧显示大小 |
-| 音频 | text_value | 右侧显示大小 |
-| 系统数据 | text_value | 右侧显示大小 |
-| 清理推荐 | button | — |
-| 一键清理 | button | — |
-| 排序方式 | text_value | 右侧"大小" |
-| <应用名> | text_value | 右侧显示占用大小 |
-| 用户数据 | section_header | — |
-| 大文件 | text_value | 右侧显示大小 |
+| 子项 | 形态 | id | 状态/操作说明 |
+|------|------|-----|------------|
+| 使用率 | text | (无id) | "16%" 百分比文本，bounds 约 [84,381][269,501] |
+| 已使用/总大小 | text | (无id) | "已使用 83.02 GB/512 GB"，bounds 约 [84,501][556,550] |
+| DataPanel | DataPanel | (无id) | 可视化进度环，bounds 约 [84,586][1236,694] |
+| 类别标签 | text | (无id) | 应用/图片/视频/音频/文件/HarmonyOS/系统数据 |
+| 应用大小 | text | `storage_app_data_size` | 分区标题 |
+| 排序方式 | text_value | `AppGroup.SortType.title/result` | 右侧"大小" |
+| 应用占用项 | text_value | `AppGroup.<包名>,0.title/result` | 右侧显示大小（如"3.43 GB"） |
+| 一键清理 | — | — | 当前设备无此按钮 |
+
+**关键规律**:
+- 使用率文本以 `%` 结尾，无 id，需排除电池百分比（id 含 battery）
+- 已使用/总大小文本以"已使用"开头，格式: `已使用 X GB/Y GB`
+- 应用占用通过 id 匹配: `Setting.Storage.AppGroup.<包名>,0.title` 对应 `.result`
+- "一键清理"按钮在当前设备/版本上不存在
 
 ---
 
@@ -613,7 +616,7 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 | 锁屏密码 | nav_item | — |
 | 隐私密码 | nav_item | — |
 | 锁定时允许访问 | section_header | — |
-| 控制中心 | toggle_row | checked → ON/OFF |
+| 控制中心 | toggle_row | ❌ checked 始终 false，不可查询 |
 
 - **注意**: 指纹/人脸识别需先设置锁屏密码才能使用
 
@@ -703,6 +706,23 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 - 按钮: "取消" / "关闭"
 - 处理: `click_by_text(layout, '关闭')` 点击确认
 
+### 3.18 关于本机
+
+- **导航路径**: 无法通过设置首页常规入口到达，使用搜索 `search_setting` 或自定义搜索导航
+- **搜索关键词**: `关于本机`
+- **页面加载**: 进入后需等待 2s
+
+| 子项 | id | 形态 | 状态/操作说明 |
+|------|-----|------|------------|
+| 设备名称 | `version_info_group.display_device_name` | text_value | 右侧如"HuaweiHotspot" |
+| 型号名称 | `version_info_group.display_device_name` | text_value | 右侧如"HUAWEI Pura X 典藏版" |
+| 型号代码 | `version_info_group.product_model` | text_value | 右侧如"VDE-AL10" |
+| **HarmonyOS 版本** | `version_info_group.harmonyos_version.title/result` | text_value | 右侧如"6.1.0"，**连续点击 7 次开启开发者模式** |
+| 软件版本 | `version_info_group.software_version.title/result` | text_value | 右侧如"6.1.0.117 (SP6C00E115R3P6patch15)" |
+
+- **开启开发者模式**: 在关于本机页面连续点击"HarmonyOS 版本"行 7 次
+- **搜索导航注意**: `search_setting('关于本机')` 可能点击到搜索框文本而非搜索结果，需通过 `searchResultItem` id 定位搜索结果后点击其可点击父级
+
 ---
 
 ## 四、第三级页面结构（text_value / nav_item 子页面内部）
@@ -758,8 +778,39 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 | 智感握姿 | text_value ("已开启") | Toggle "智感握姿" (checked=true) | 点 Toggle 切换 |
 | 智感支付 | text_value ("已关闭") | Toggle "智感支付" (false) + text_value "默认支付方式" | 点 Toggle 切换 |
 | 系统导航 | nav_item | 子页面: 3个 Toggle (无文字, 靠坐标匹配最近Text) | 见下方补充 |
+| 日期和时间 | text_value ("2026年x月x日") | Toggle "24小时制" + Toggle "自动设置" + text_value "时区" | 见下方补充 |
 
-### 电池 — 子页面结构
+**日期和时间子页面详细结构**:
+
+| 控件 | id | 形态 | 状态/操作 |
+|------|-----|------|----------|
+| 24 小时制 | `Time24HourGroup.Time24HourItem` | toggle_row | checked → ON/OFF |
+| 自动设置（自动时区） | `DateTimeZoneGroup.auto_setting.result` | toggle_row | checked → ON/OFF |
+| 时区 | `DateTimeZoneGroup.time_zone_setting.result` | text_value | 右侧显示如"GMT+08:00 中国标准时间" |
+
+- **时区行仅在"自动设置"关闭时可点击**，开启时点击无反应
+- 点击时区行进入时区选择列表：按字母排序，右侧有字母索引 (A-Z)
+- 列表项格式：城市/地区 (国家) + GMT偏移量，如"阿布扎比 (阿拉伯联合酋长国)" / "GMT+4:00"
+- 列表项 Text clickable=false，需点击坐标
+
+**开发者选项子页面详细结构**:
+
+| 控件 | id | 形态 | 状态/操作 |
+|------|-----|------|----------|
+| 开发者选项 | — | toggle_row | 顶部 Toggle，checked=开发者模式状态 |
+| 充电温度限制 | — | toggle_row | checked → ON/OFF |
+| 自动系统更新 | — | toggle_row | checked → ON/OFF |
+| 系统回退 | `entry_title_system_rollback_settings` | nav_item | — |
+| **USB 调试** | `entry_toggle_usb_debug` | toggle_row | checked → ON/OFF，开启时可能弹确认对话框 |
+| 意图框架调试 | `entry_title_insight_intent_settings` | toggle_row | checked → ON/OFF |
+| 显示刷新频率 | — | toggle_row | checked → ON/OFF |
+| 关闭充电 | `entry_toggle_usb_not_charging` | toggle_row | checked → ON/OFF |
+| 清除受信任设备 | `entry_title_recall_usb_authorize` | nav_item | — |
+| 无线调试 | — | toggle_row | checked → ON/OFF |
+
+- **导航**: 系统 > 开发者选项（需滑动 2 次找到入口）
+- USB 调试 Toggle 通过 id=`entry_toggle_usb_debug` 直接定位，无需文本匹配
+- ⚠ **关闭 USB 调试会导致 hdc 连接断开**，脚本测试时仅测 query 模式
 
 | 子项 | 列表页形态 | 子页面内控件 | 操作方式 |
 |------|----------|------------|---------|
@@ -2118,39 +2169,52 @@ if len(texts) < 3:
 
 **打开方式**: 从屏幕顶部右侧下滑
 
-**JSON 结构**: 控制中心是一个包含多个 Toggle/Button 的面板
+**打开控制中心的脚本方式**:
+```python
+# 从屏幕右上角下滑到屏幕中部（动态坐标，跨设备兼容）
+w, h = get_screen_size()
+hdc_shell('uitest', 'uiInput', 'swipe', str(w - 50), '50', str(w - 50), str(int(h * 0.5)))
+time.sleep(2)
+```
+
+**JSON 结构**: 控制中心使用 `NewToggleBaseComponent` 组件，每个开关包含：
+- `Stack` id=`transition_toggle<名称>`，clickable=true（图标容器）
+- `Canvas` id=`Ctrl.NewToggleBaseComponent_Image_<名称>`（图标渲染，clickable=false）
+- `Text` id=`Ctrl.NewToggleBaseComponent_Text_<名称>`（开关名称）
+
+**⚠️ 重要限制 — 控制中心开关状态不可查询**:
+- `checked`、`selected` 属性对**所有**控制中心组件始终为 `false`，无论开关实际状态
+- `backgroundColor` 始终为 `#00000000`
+- `dumpLayout -a`（扩展属性）同样无法区分开启/关闭状态
+- 图标使用 Canvas 绘制，状态仅体现在图标视觉颜色上（蓝色=开启，灰色=关闭）
+- `param get`、`settings`、`wm` 等系统命令在该设备上不可用（errNum 1002 或命令不存在）
+- **结论**：控制中心开关只能执行点击切换操作，无法通过布局信息查询当前状态
+- 如需查询状态，应通过设置 App 中对应设置项查询
 
 **可操作的开关**:
 
-| 开关 | 控件类型 | 操作方式 |
-|------|---------|---------|
-| WLAN | Toggle/Button | 点击切换 |
-| 蓝牙 | Toggle/Button | 点击切换 |
-| 飞行模式 | Toggle/Button | 点击切换 |
-| 免打扰 | Toggle/Button | 点击切换 |
-| 自动旋转 | Toggle/Button | 点击切换 |
-| 亮度 | Slider | 拖动调整 |
-| 媒体音量 | Slider | 拖动调整 |
-| 省电模式 | Toggle/Button | 点击切换 |
-| NFC | Toggle/Button | 点击切换 |
-| 热点 | Toggle/Button | 点击切换 |
-| 投屏 | Button | 点击打开选择器 |
+| 开关 | 控件类型 | 操作方式 | 可查询状态 |
+|------|---------|---------|-----------|
+| WLAN | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 蓝牙 | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 飞行模式 | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 免打扰 | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 旋转锁定 | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 亮度 | Slider | 拖动调整 | — |
+| 媒体音量 | Slider | 拖动调整 | — |
+| 省电模式 | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| NFC | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 热点 | Toggle/Button | 点击切换 | ❌ 控制中心不可查 |
+| 投屏 | Button | 点击打开选择器 | — |
 
-**打开控制中心的脚本方式**:
-```python
-# 方法 1: 从屏幕顶部右侧下滑
-hdc_shell('uitest', 'uiInput', 'swipe', '1260', '50', '1260', '800')
-
-# 方法 2: 使用 keyEvent (如有快捷键)
-# 注意: HarmonyOS NEXT 的控制中心打开方式可能需要验证
-```
+> **注意**: 上表中"可查询状态"指通过控制中心 dumpLayout 查询。如需查询这些开关的状态，请通过设置 App 对应设置项查询。
 
 **优势**: 控制中心操作只需 1 步（下拉 + 点击），而设置应用需要 2-3 步导航
 
 **劣势**: 
+- **开关状态不可查询**：所有控制中心组件的 `checked`/`selected` 始终为 `false`，`dumpLayout -a` 也无效
 - 控制中心布局可能因设备/版本不同而变化
 - 部分设置项（如放大手势、深色模式）不在控制中心
-- 控制中心的 Toggle 结构可能与设置应用不同
 
 ### 通知面板
 
@@ -2168,9 +2232,9 @@ hdc_shell('uitest', 'uiInput', 'swipe', '1260', '50', '1260', '800')
 
 | 场景 | 推荐路径 | 原因 |
 |------|---------|------|
-| 开关 WLAN/蓝牙/飞行模式 | 控制中心 | 1 步完成 |
-| 开关免打扰 | 控制中心或设置 | 都可以 |
-| 查询开关状态 | 设置应用 | 控制中心 Toggle 可能无 checked 属性 |
+| 开关 WLAN/蓝牙/飞行模式 | 控制中心 | 1 步完成（仅切换，不可查状态） |
+| 开关免打扰 | 控制中心或设置 | 都可以（设置可查状态） |
+| 查询开关状态 | 设置应用 | **控制中心 Toggle 的 checked/selected 始终为 false，不可查询** |
 | 开关放大手势/深色模式 | 设置应用 | 控制中心无此选项 |
 | 调节音量 | 控制中心 | 有 Slider |
 | 操作需要弹窗确认的功能 | 设置应用 | 控制中心可能不触发弹窗 |

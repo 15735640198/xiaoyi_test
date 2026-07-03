@@ -76,35 +76,81 @@ def set_zoom_gesture(desired):
                           scroll=4, third_level_toggle='放大手势')
 ```
 
-已有 API 函数：
+已有 API 函数（按分类归属排列）：
+
+**网络与连接**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| WLAN | `query_wlan()` | `set_wlan('on'/'off')` / `connect_wlan(ssid, password)` |
+| WLAN下自动下载 | `query_wlan_auto_download()` | `set_wlan_auto_download('on'/'off')` |
+| 蓝牙开关 | `query_bluetooth()` | — |
+| 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
+| 星闪 | `query_nearlink()` | — |
+| 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
+| 个人热点 | `query_personal_hotspot()` | — |
+| 热点配置 | `query_hotspot_config()` | `set_hotspot_name(name)` / `set_hotspot_password(pwd)` |
+| 网络加速 | `query_network_acceleration()` | `set_network_acceleration('on'/'off')` |
+
+**移动网络与 SIM 卡**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| 默认数据卡 | `query_default_data_card()` | — |
+| SIM卡状态 | `query_sim_status()` / `query_sim_carrier()` | — |
+| SIM卡使用状态 | `query_sim_enabled(card)` | `set_sim_enabled(card, 'on'/'off')` |
+
+**显示与亮度**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| 屏幕亮度 | `query_brightness()` | — |
+| 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
+| 电子书模式 | `query_ebook_mode()` | — |
+
+**声音**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| 朗读速度 | `query_speech_rate()` | `set_speech_rate(value)` |
+| 来电铃声 | `query_ringtone()` | `set_ringtone_default()` |
+
+**电池**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| 省电模式 | `query_power_saving()` | `set_power_saving('on'/'off')` |
+
+**通知与免打扰**
 
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
 | 勿扰模式 | `query_dnd()` | `set_dnd('on'/'off')` |
+
+**辅助功能**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
 | 放大手势 | `query_zoom_gesture()` | `set_zoom_gesture('on'/'off')` |
-| 开发者模式 | `query_developer_mode()` | — |
-| 个人热点 | `query_personal_hotspot()` | — |
-| 省电模式 | `query_power_saving()` | `set_power_saving('on'/'off')` |
-| 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
-| WLAN | `query_wlan()` | `set_wlan('on'/'off')` / `connect_wlan(ssid, password)` |
-| 星闪 | `query_nearlink()` | — |
-| 蓝牙开关 | `query_bluetooth()` | — |
-| 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
-| 屏幕亮度 | `query_brightness()` | — |
-| 朗读速度 | `query_speech_rate()` | `set_speech_rate(value)` |
-| 锁屏方式 | `query_lock_screen_method()` | —（安全验证，不可自动化） |
-| 来电铃声 | `query_ringtone()` | `set_ringtone_default()` |
-| 热点配置 | `query_hotspot_config()` | `set_hotspot_name(name)` / `set_hotspot_password(pwd)` |
-| 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
-| 电子书模式 | `query_ebook_mode()` | — |
+
+**系统**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
 | 系统导航模式 | `query_navigation_mode()` | — |
-| 默认数据卡 | `query_default_data_card()` | — |
-| WLAN下自动下载 | `query_wlan_auto_download()` | `set_wlan_auto_download('on'/'off')` |
-| SIM卡状态 | `query_sim_status()` / `query_sim_carrier()` | — |
-| SIM卡使用状态 | `query_sim_enabled(card)` | `set_sim_enabled(card, 'on'/'off')` |
-| 网络加速 | `query_network_acceleration()` | `set_network_acceleration('on'/'off')` |
 | 系统语言 | `query_system_language()` | `add_system_language(lang)` |
 | 默认输入法 | `query_default_input_method()` | — |
+| 自动时区 | `query_auto_timezone()` | `set_auto_timezone('on'/'off')` |
+| 系统时区 | `query_timezone()` | `set_timezone(timezone_name)` |
+| 存储空间 | `query_storage()` | — |
+| 开发者模式 | `query_developer_mode()` | `set_developer_mode('on'/'off')` |
+| USB调试 | `query_usb_debug()` | `set_usb_debug('on'/'off')` |
+
+**安全**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| 锁屏方式 | `query_lock_screen_method()` | —（安全验证，不可自动化） |
 
 ### 第 4 步：生成 CLI 脚本（薄壳）
 
@@ -198,6 +244,10 @@ ui_test_scriptss/
 ├── network_acceleration_manager.py 网络加速
 ├── language_manager.py             系统语言查询/添加
 ├── input_method_manager.py         默认输入法查询
+├── timezone_manager.py             自动时区开关/系统时区查询与设置
+├── storage_manager.py              存储空间使用率/已用/总大小/应用占用查询
+├── usb_debug_manager.py            USB调试开关查询与设置
+├── developer_mode_manager.py       开发者模式查询与开关（点击版本号7次/关闭总开关）
 ├── 脚本生成失败说明.md             无法生成的功能及原因
 ├── HarmonyOS设置功能知识库.md       知识库 v5 (15章, 1527行)
 └── SKILL.md                        本文件
