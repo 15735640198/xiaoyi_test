@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""调试: 屏幕亮度查询"""
+"""调试: 屏幕亮度查询 - 深入分析"""
 import sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+import json
 import hdc_utils
 from hdc_utils import *
 
@@ -18,37 +19,27 @@ if not layout:
 
 time.sleep(1)
 
-# 打印所有含"亮度"的文本
-print("=== 含'亮度'的组件 ===")
-for c in find_components(layout, lambda c: '亮度' in (attr(c, 'text', '') + attr(c, 'originalText', ''))):
-    b = parse_full_bounds(attr(c, 'bounds', ''))
-    print(f"  type={attr(c, 'type')} text={attr(c, 'text', '')!r} orig={attr(c, 'originalText', '')!r} bounds=[{b[0]},{b[1]}][{b[2]},{b[3]}] center=({(b[0]+b[2])//2},{(b[1]+b[3])//2})")
-
-# 打印所有 Slider
-print("\n=== Slider 组件 ===")
+# 打印 Slider 的完整 JSON（所有属性）
+print("=== Slider 完整属性 ===")
 sliders = find_sliders(layout)
-print(f"Slider 数量: {len(sliders)}")
 for sl in sliders:
-    b = parse_full_bounds(attr(sl, 'bounds', ''))
-    print(f"  type={attr(sl, 'type')} text={attr(sl, 'text', '')!r} orig={attr(sl, 'originalText', '')!r} value={attr(sl, 'value', '')!r} bounds=[{b[0]},{b[1]}][{b[2]},{b[3]}] center=({(b[0]+b[2])//2},{(b[1]+b[3])//2})")
+    print(json.dumps(sl, ensure_ascii=False, indent=2))
 
-# 测试 find_by_text_nearest
-print("\n=== find_by_text_nearest('亮度') ===")
-comps = find_by_text_nearest(layout, '亮度')
-for c in comps[:5]:
+# 打印滑块附近(y=1700~2100)的所有组件
+print("\n=== 滑块附近所有组件 (y=1700~2100) ===")
+all_comps = find_components(layout, lambda c: True)
+for c in all_comps:
     b = parse_full_bounds(attr(c, 'bounds', ''))
+    if b and b[1] >= 1700 and b[3] <= 2100:
+        txt = attr(c, 'text', '') or attr(c, 'originalText', '')
+        print(f"  type={attr(c, 'type')} text={txt!r} id={attr(c, 'id', '')!r} bounds=[{b[0]},{b[1]}][{b[2]},{b[3]}]")
+
+# 打印页面上所有带数字的文本组件
+print("\n=== 含数字的 Text 组件 ===")
+for c in find_components(layout, lambda c: attr(c, 'type') == 'Text'):
     txt = attr(c, 'text', '') or attr(c, 'originalText', '')
-    print(f"  type={attr(c, 'type')} text={txt!r} center=({(b[0]+b[2])//2},{(b[1]+b[3])//2})")
-
-# 测试 read_status_slider
-print("\n=== read_status_slider('亮度') ===")
-result = read_status_slider(layout, '亮度')
-print(f"  返回: {result!r}")
-
-# 测试新的 query_brightness
-print("\n=== query_brightness() ===")
-import settings_api
-result2 = settings_api.query_brightness()
-print(f"  返回: {result2!r}")
+    if any(ch.isdigit() for ch in txt):
+        b = parse_full_bounds(attr(c, 'bounds', ''))
+        print(f"  text={txt!r} id={attr(c, 'id', '')!r} bounds=[{b[0]},{b[1]}][{b[2]},{b[3]}] center=({(b[0]+b[2])//2},{(b[1]+b[3])//2})")
 
 print("\n=== 完成 ===")

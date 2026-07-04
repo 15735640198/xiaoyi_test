@@ -104,7 +104,7 @@ def set_zoom_gesture(desired):
 
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
-| 屏幕亮度 | `query_brightness()` | — |
+| 屏幕亮度 | `query_brightness()` → dict | — |
 | 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
 | 电子书模式 | `query_ebook_mode()` | — |
 
