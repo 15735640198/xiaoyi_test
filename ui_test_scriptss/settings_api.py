@@ -505,11 +505,26 @@ def disconnect_bluetooth(device_name):
     return False, 'connected'
 
 
-# ── 屏幕亮度 (slider_row 示例) ──
+# ── 屏幕亮度 ──
 
 def query_brightness():
-    """查询屏幕亮度值 → 字符串(如 '81.000000') | 'unknown'"""
-    return query_setting('显示和亮度', '亮度', 'slider_row', scroll=2)
+    """
+    查询屏幕亮度值 → 字符串(如 '82.739853') | 'unknown'
+    亮度滑块旁无独立"亮度"文本标签，无法通过文本匹配 slider，
+    直接查找页面上的 Slider 组件读取其 text 属性。
+    """
+    layout = navigate_to_page('显示和亮度', 2)
+    if not layout:
+        return None
+    for i in range(2):
+        sliders = find_sliders(layout)
+        if sliders:
+            val = attr(sliders[0], 'text', '') or attr(sliders[0], 'originalText', '')
+            if val:
+                return val
+        swipe_up()
+        layout = dump_layout()
+    return 'unknown'
 
 
 # ── 朗读速度（语速）──
