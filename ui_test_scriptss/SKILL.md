@@ -91,6 +91,8 @@ def set_zoom_gesture(desired):
 | 个人热点 | `query_personal_hotspot()` | — |
 | 热点配置 | `query_hotspot_config()` | `set_hotspot_name(name)` / `set_hotspot_password(pwd)` |
 | 网络加速 | `query_network_acceleration()` | `set_network_acceleration('on'/'off')` |
+| NFC | `query_nfc()` | `set_nfc('on'/'off')` |
+| 默认付款应用 | `query_default_payment_app()` | `set_default_payment_app(app_name)` |
 
 **移动网络与 SIM 卡**
 
@@ -248,6 +250,7 @@ ui_test_scriptss/
 ├── brightness_manager.py           屏幕亮度百分比查询
 ├── font_size_manager.py            字体大小/字体粗细查询与设置
 ├── color_inversion_manager.py      颜色反转开关查询与设置
+├── nfc_manager.py                  NFC开关/默认付款应用查询与设置
 ├── query_multi_status.py           综合查询 (省电/亮度/电子书/导航)
 ├── query_default_data_card.py      40行
 ├── wlan_auto_download_manager.py   50行

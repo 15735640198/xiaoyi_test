@@ -181,6 +181,85 @@ def set_color_inversion(desired):
                           scroll=4, third_level_toggle='颜色反转')
 
 
+# ── NFC 与默认付款应用 ──
+
+def query_nfc():
+    """查询 NFC 开关状态 → 'on' | 'off' | 'unknown'"""
+    return query_setting('多设备协同', 'NFC', 'text_value', scroll=1)
+
+
+def set_nfc(desired):
+    """开关 NFC → (success, new_status)"""
+    return toggle_setting('多设备协同', 'NFC', 'text_value', desired,
+                          scroll=1, third_level_toggle='NFC')
+
+
+def _open_nfc_page():
+    """导航到 NFC 子页面，返回 layout 或 None"""
+    layout = navigate_to_page('多设备协同', 1)
+    if not layout:
+        return None
+    if not click_by_text(layout, 'NFC', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, 'NFC', 2.5):
+                break
+        else:
+            return None
+    time.sleep(1)
+    return dump_layout()
+
+
+def query_default_payment_app():
+    """
+    查询默认付款应用 → 应用名称文本 | None
+    需进入 多设备协同 > NFC 子页面读取。
+    """
+    layout = _open_nfc_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '默认付款应用')
+
+
+def set_default_payment_app(app_name):
+    """
+    设置默认付款应用
+    app_name: 付款应用名称关键词 (如 '华为钱包' 或 '钱包')
+    → (success, message)
+    """
+    layout = _open_nfc_page()
+    if not layout:
+        return False, '未找到 NFC 入口'
+
+    # 点击"默认付款应用"行
+    if not click_by_text(layout, '默认付款应用', 2.0):
+        return False, '未找到默认付款应用入口'
+    time.sleep(2)
+    layout = dump_layout()
+
+    # 在列表中查找目标应用
+    for i in range(5):
+        matches = find_components(layout, lambda c: app_name in (
+            attr(c, 'text', '') + attr(c, 'originalText', '')))
+        if matches:
+            target = matches[0]
+            center = parse_bounds(attr(target, 'bounds'))
+            if center:
+                click_at(center[0], center[1], 2.0)
+                time.sleep(1)
+                # 返回到 NFC 子页面
+                hdc_shell('uitest', 'uiInput', 'keyEvent', 'Back')
+                time.sleep(1)
+                layout = dump_layout()
+                current = read_text_value_raw(layout, '默认付款应用')
+                return True, f'默认付款应用已设置为: {current}'
+        swipe_up(1.0)
+        layout = dump_layout()
+
+    return False, f'未找到匹配的付款应用: {app_name}'
+
+
 # ── 开发者模式 ──
 
 def query_developer_mode():
