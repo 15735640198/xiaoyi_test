@@ -797,14 +797,20 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 
 | 控件 | id | 形态 | 状态/操作 |
 |------|-----|------|----------|
-| 24 小时制 | `Time24HourGroup.Time24HourItem` | toggle_row | checked → ON/OFF |
+| 24 小时制 | `Time24HourGroup.Time24HourItem` | toggle_row | checked → ON(24小时)/OFF(12小时) |
 | 自动设置（自动时区） | `DateTimeZoneGroup.auto_setting.result` | toggle_row | checked → ON/OFF |
+| 日期 | `DateTimeZoneGroup.date_setting` | text_value | 右侧如"2026年7月6日"，仅自动设置关闭时显示 |
+| 时间 | `DateTimeZoneGroup.time_setting` | text_value | 右侧如"15:47"，仅自动设置关闭时显示 |
 | 时区 | `DateTimeZoneGroup.time_zone_setting.result` | text_value | 右侧显示如"GMT+08:00 中国标准时间" |
 
-- **时区行仅在"自动设置"关闭时可点击**，开启时点击无反应
+- **时区/日期/时间行仅在"自动设置"关闭时显示和可点击**，开启时不显示
 - 点击时区行进入时区选择列表：按字母排序，右侧有字母索引 (A-Z)
 - 列表项格式：城市/地区 (国家) + GMT偏移量，如"阿布扎比 (阿拉伯联合酋长国)" / "GMT+4:00"
 - 列表项 Text clickable=false，需点击坐标
+- 点击时间行打开 TimePicker（两列滚动轮：左小时右分钟，底部"取消"/"确定"按钮）
+- 点击日期行打开 DatePicker（三列滚动轮：年/月/日，底部"取消"/"确定"按钮）
+- 滚动轮操作方式：**点击相邻项位置**（选中项上方/下方 138px 处）可精确移动 1 步；swipe 方式不够精确不推荐
+- Column 的 text 属性显示当前选中值，可用于每步验证
 
 **开发者选项子页面详细结构**:
 

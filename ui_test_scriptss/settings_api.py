@@ -1476,6 +1476,191 @@ def set_timezone(timezone_name):
     return False, f'未找到匹配的时区: {timezone_name}'
 
 
+# ── 时间制式、日期、时间 ──
+
+def query_time_format():
+    """
+    查询时间制式 → '24小时' | '12小时' | 'unknown' | None
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return None
+    status = read_status_toggle_row(layout, '24 小时制')
+    if status == 'on':
+        return '24小时'
+    elif status == 'off':
+        return '12小时'
+    return status
+
+
+def set_time_format(desired):
+    """
+    设置时间制式
+    desired: '24小时' | '12小时' (也接受 '24' / '12')
+    → (success, new_format)
+    """
+    if desired in ('24', '24小时', '24h'):
+        target = 'on'
+    elif desired in ('12', '12小时', '12h'):
+        target = 'off'
+    else:
+        return False, None
+
+    layout = _open_date_time_page()
+    if not layout:
+        return False, None
+    status = read_status_toggle_row(layout, '24 小时制')
+    if status is None:
+        return False, None
+    if status == target:
+        return True, '24小时' if target == 'on' else '12小时'
+
+    toggles = find_toggles(layout)
+    comps = find_by_text_nearest(layout, '24 小时制')
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        for tg in toggles:
+            tc = parse_bounds(attr(tg, 'bounds'))
+            if tc and abs(tc[1] - center[1]) < 80:
+                click_at(tc[0], tc[1], 2.0)
+                layout = dump_layout()
+                new_status = read_status_toggle_row(layout, '24 小时制')
+                new_fmt = '24小时' if new_status == 'on' else '12小时'
+                return (new_status == target), new_fmt
+    return False, status
+
+
+def query_date():
+    """
+    查询系统日期 → 如 '2026年7月6日' | None
+    需自动设置关闭才显示日期行。
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '日期')
+
+
+def query_time():
+    """
+    查询系统时间 → 如 '15:47' | None
+    需自动设置关闭才显示时间行。
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '时间')
+
+
+def set_time(hour, minute):
+    """
+    设置系统时间
+    hour: 0-23, minute: 0-59
+    需先关闭自动设置（如开启）。
+    → (success, message)
+    """
+    layout = _open_date_time_page()
+    if not layout:
+        return False, '未找到日期和时间入口'
+
+    # 关闭自动设置
+    auto = read_status_toggle_row(layout, '自动设置')
+    if auto == 'on':
+        set_auto_timezone('off')
+        time.sleep(1)
+        layout = dump_layout()
+
+    # 点击"时间"行打开选择器
+    if not click_by_text(layout, '时间', 2.0):
+        return False, '未找到时间入口'
+    time.sleep(2)
+    layout = dump_layout()
+
+    # 找 TimePicker 中的 Column (小时列和分钟列)
+    columns = find_components(layout, lambda c: attr(c, 'type', '') == 'Column')
+    hour_col = None
+    min_col = None
+    for col in columns:
+        txt = attr(col, 'text', '') or attr(col, 'originalText', '')
+        b = parse_full_bounds(attr(col, 'bounds', ''))
+        if not b or not txt:
+            continue
+        try:
+            val = int(txt)
+        except ValueError:
+            continue
+        cx = (b[0] + b[2]) // 2
+        if cx < 660 and val < 24:
+            hour_col = (b, val)
+        elif cx >= 660 and val < 60:
+            min_col = (b, val)
+
+    if not hour_col or not min_col:
+        # 点击取消关闭选择器
+        click_by_text(layout, '取消', 0.5)
+        return False, '无法读取时间选择器'
+
+    cur_h = hour_col[1]
+    cur_m = min_col[1]
+    h_bounds = hour_col[0]
+    m_bounds = min_col[0]
+
+    def read_picker_val(bounds):
+        """重新 dump 并读取指定列的当前值"""
+        layout2 = dump_layout()
+        for col in find_components(layout2, lambda c: attr(c, 'type', '') == 'Column'):
+            txt = attr(col, 'text', '') or attr(col, 'originalText', '')
+            b = parse_full_bounds(attr(col, 'bounds', ''))
+            if not b or not txt:
+                continue
+            try:
+                val = int(txt)
+            except ValueError:
+                continue
+            # 按 X 坐标匹配列
+            cx = (b[0] + b[2]) // 2
+            bx = (bounds[0] + bounds[2]) // 2
+            if abs(cx - bx) < 100:
+                return val
+        return None
+
+    def swipe_column_to_target(bounds, target_val, max_val):
+        """逐步点击相邻项直到到达目标值"""
+        cx = (bounds[0] + bounds[2]) // 2
+        cy = (bounds[1] + bounds[3]) // 2
+        for _ in range(max_val + 1):
+            cur = read_picker_val(bounds)
+            if cur is None or cur == target_val:
+                return
+            diff = target_val - cur
+            if diff > max_val // 2:
+                diff -= max_val
+            elif diff < -max_val // 2:
+                diff += max_val
+            if diff == 0:
+                return
+            # 点击相邻项位置: 增大点下方, 减小点上方
+            if diff > 0:
+                click_at(cx, cy + 138, 0.3)
+            else:
+                click_at(cx, cy - 138, 0.3)
+
+    swipe_column_to_target(h_bounds, hour, 24)
+    swipe_column_to_target(m_bounds, minute, 60)
+
+    # 点击"确定"
+    layout = dump_layout()
+    if click_by_text(layout, '确定', 1.0):
+        time.sleep(1)
+        layout = dump_layout()
+        new_time = read_text_value_raw(layout, '时间')
+        return True, f'时间已设置为: {new_time}'
+
+    return False, '无法确认设置'
+
+
 # ── 存储空间 ──
 
 def _open_storage_page():

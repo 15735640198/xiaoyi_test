@@ -144,6 +144,9 @@ def set_zoom_gesture(desired):
 | 默认输入法 | `query_default_input_method()` | — |
 | 自动时区 | `query_auto_timezone()` | `set_auto_timezone('on'/'off')` |
 | 系统时区 | `query_timezone()` | `set_timezone(timezone_name)` |
+| 时间制式 | `query_time_format()` | `set_time_format('24'/'12')` |
+| 系统日期 | `query_date()` | — |
+| 系统时间 | `query_time()` | `set_time(hour, minute)` |
 | 存储空间 | `query_storage()` | — |
 | 开发者模式 | `query_developer_mode()` | `set_developer_mode('on'/'off')` |
 | USB调试 | `query_usb_debug()` | `set_usb_debug('on'/'off')` |
@@ -251,7 +254,7 @@ ui_test_scriptss/
 ├── network_acceleration_manager.py 网络加速
 ├── language_manager.py             系统语言查询/添加
 ├── input_method_manager.py         默认输入法查询
-├── timezone_manager.py             自动时区开关/系统时区查询与设置
+├── timezone_manager.py             日期时间管理(时区/时间制式/时间设置)
 ├── storage_manager.py              存储空间使用率/已用/总大小/应用占用查询
 ├── usb_debug_manager.py            USB调试开关查询与设置
 ├── developer_mode_manager.py       开发者模式查询与开关（点击版本号7次/关闭总开关）
