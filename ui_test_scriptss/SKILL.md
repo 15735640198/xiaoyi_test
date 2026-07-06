@@ -104,7 +104,7 @@ def set_zoom_gesture(desired):
 
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
-| 屏幕亮度 | `query_brightness()` → dict | — |
+| 屏幕亮度 | `query_brightness()` → 百分比 | — |
 | 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
 | 电子书模式 | `query_ebook_mode()` | — |
 
@@ -239,6 +239,7 @@ ui_test_scriptss/
 ├── ringtone_manager.py             70行
 ├── hotspot_config_manager.py       75行
 ├── auto_brightness_manager.py      50行
+├── brightness_manager.py           屏幕亮度百分比查询
 ├── query_multi_status.py           综合查询 (省电/亮度/电子书/导航)
 ├── query_default_data_card.py      40行
 ├── wlan_auto_download_manager.py   50行

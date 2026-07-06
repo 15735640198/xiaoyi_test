@@ -509,38 +509,23 @@ def disconnect_bluetooth(device_name):
 
 def query_brightness():
     """
-    查询屏幕亮度 → dict | None
-    通过 DisplayPowerManagerService 读取真实硬件亮度值（非 UI slider 位置）。
-
-    返回:
-      {
-        'brightness': 34,       # 当前亮度 (1-255)
-        'max': 255,             # 最大亮度
-        'min': 1,               # 最小亮度
-        'percent': 13.3,        # 亮度百分比 (brightness/max*100)
-      }
+    查询屏幕亮度百分比 → float (如 100.0) | None
+    通过 UI slider 的 text 属性读取（0-255 标度），换算为百分比。
     """
-    output = hdc_shell('hidumper', '-s', 'DisplayPowerManagerService')
-    if not output:
+    layout = navigate_to_page('显示和亮度', 2)
+    if not layout:
         return None
-    result = {'brightness': None, 'max': 255, 'min': 1, 'percent': None}
-    for line in output.splitlines():
-        line = line.strip()
-        if 'Brightness=' in line and 'DeviceBrightness' not in line:
-            m = re.search(r'Brightness=(\d+)', line)
-            if m:
-                result['brightness'] = int(m.group(1))
-        elif line.startswith('Brightness Limits:'):
-            mx = re.search(r'Max=(\d+)', line)
-            mn = re.search(r'Min=(\d+)', line)
-            if mx:
-                result['max'] = int(mx.group(1))
-            if mn:
-                result['min'] = int(mn.group(1))
-    if result['brightness'] is None:
-        return None
-    result['percent'] = round(result['brightness'] / result['max'] * 100, 1)
-    return result
+    for i in range(2):
+        for sl in find_sliders(layout):
+            val = attr(sl, 'text', '') or attr(sl, 'originalText', '')
+            if val:
+                try:
+                    return round(float(val) / 255 * 100, 1)
+                except ValueError:
+                    pass
+        swipe_up()
+        layout = dump_layout()
+    return None
 
 
 # ── 朗读速度（语速）──
