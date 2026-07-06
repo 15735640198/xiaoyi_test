@@ -86,7 +86,7 @@ def set_zoom_gesture(desired):
 | WLAN下自动下载 | `query_wlan_auto_download()` | `set_wlan_auto_download('on'/'off')` |
 | 蓝牙开关 | `query_bluetooth()` | `set_bluetooth('on'/'off')` |
 | 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
-| 星闪 | `query_nearlink()` | — |
+| 星闪 | `query_nearlink()` | `set_nearlink('on'/'off')` |
 | 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
 | 个人热点 | `query_personal_hotspot()` | — |
 | 热点配置 | `query_hotspot_config()` | `set_hotspot_name(name)` / `set_hotspot_password(pwd)` |

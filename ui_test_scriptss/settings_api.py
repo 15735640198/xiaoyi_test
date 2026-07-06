@@ -315,6 +315,11 @@ def query_nearlink():
     return query_setting('星闪和蓝牙', '星闪', 'toggle_row', scroll=2)
 
 
+def set_nearlink(desired):
+    """开关星闪 → (success, new_status)"""
+    return toggle_setting('星闪和蓝牙', '星闪', 'toggle_row', desired, scroll=2)
+
+
 # ── 蓝牙 ──
 
 def query_bluetooth():
