@@ -334,13 +334,26 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 | 自动调节 | toggle_row | checked → ON/OFF |
 | 护眼模式 | text_value | 右侧"已关闭"/"已开启" |
 | 电子书模式 | nav_item | 进入子页面 |
-| 字体大小和界面缩放 | nav_item | 进入子页面 |
+| 字体大小和界面缩放 | nav_item | 进入子页面（见下） |
 | 休眠 | text_value | 右侧"10 分钟后" |
 | 注视屏幕不熄屏 | toggle_row | checked → ON/OFF |
 | 色彩调节与色温 | nav_item | 进入子页面 |
 | 智能分辨率 | toggle_row | checked → ON/OFF |
 | 屏幕刷新率 | text_value | 右侧"智能" |
 | 高级设置 | nav_item | 进入子页面 |
+
+**子页面: 字体大小和界面缩放**
+
+- **导航路径**: 设置 > 显示和亮度 > 字体大小和界面缩放
+- **页面结构**: 预览文本 + 3 个设置项，每项为 标签(text_value) + 下方 Slider
+
+| 子项 | 形态 | 档位 | 右侧文本值 | 备注 |
+|------|------|------|-----------|------|
+| 字体大小 | text_value + slider | 4 档 (0%/25%/50%/75%) | 小/标准/大/超大 | 设为超大时弹出"设置更大字体"弹窗，需点取消 |
+| 字体粗细 | text_value + slider | 3 档 (0%/50%/100%) | 最细/标准/最粗 | slider 在 label 下方，track click 无效需 swipe |
+| 显示大小缩放 | text_value + slider | — | 默认/— | 未详细探查 |
+
+**字体粗细 slider 注意**: label 和 slider 的 Y 差约 132px，但上方相邻的字体大小 slider 也在 200px 内，`find_by_text_nearest` + Y 匹配会误匹配到字体大小 slider。需找 label **下方**的 slider。且字体粗细 slider 不响应 track click，需用 `uitest uiInput swipe` 拖动。
 
 ---
 

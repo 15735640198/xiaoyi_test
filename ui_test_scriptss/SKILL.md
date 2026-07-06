@@ -106,6 +106,8 @@ def set_zoom_gesture(desired):
 |--------|---------|---------|
 | 屏幕亮度 | `query_brightness()` → 百分比 | — |
 | 自动调节亮度 | `query_auto_brightness()` | `set_auto_brightness('on'/'off')` |
+| 字体大小 | `query_font_size()` | `set_font_size('小'/'标准'/'大'/'超大')` |
+| 字体粗细 | `query_font_weight()` | `set_font_weight('最细'/'标准'/'最粗')` |
 | 电子书模式 | `query_ebook_mode()` | — |
 
 **声音**
@@ -240,6 +242,7 @@ ui_test_scriptss/
 ├── hotspot_config_manager.py       75行
 ├── auto_brightness_manager.py      50行
 ├── brightness_manager.py           屏幕亮度百分比查询
+├── font_size_manager.py            字体大小/字体粗细查询与设置
 ├── query_multi_status.py           综合查询 (省电/亮度/电子书/导航)
 ├── query_default_data_card.py      40行
 ├── wlan_auto_download_manager.py   50行

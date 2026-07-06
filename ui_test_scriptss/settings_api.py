@@ -538,6 +538,124 @@ def query_brightness():
     return None
 
 
+# ── 字体大小和字体粗细 ──
+
+def _open_font_size_page():
+    """导航到字体大小和界面缩放页面"""
+    layout = navigate_to_page('显示和亮度', 2)
+    if not layout:
+        return None
+    if not click_by_text(layout, '字体大小和界面缩放'):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '字体大小和界面缩放'):
+                break
+        else:
+            return None
+    time.sleep(2)
+    return dump_layout()
+
+
+def query_font_size():
+    """
+    查询字体大小 → '小' | '标准' | '大' | '超大' | None
+    """
+    layout = _open_font_size_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '字体大小')
+
+
+def set_font_size(desired):
+    """
+    设置字体大小
+    desired: '小' | '标准' | '大' | '超大'
+    → (success, new_value)
+    """
+    layout = _open_font_size_page()
+    if not layout:
+        return False, None
+
+    size_map = {'小': 0, '标准': 25, '大': 50, '超大': 75}
+    if desired not in size_map:
+        return False, None
+
+    if not set_slider(layout, '字体大小', size_map[desired]):
+        return False, None
+
+    time.sleep(1)
+
+    # 超大时弹出"设置更大字体"弹窗，点取消
+    layout = dump_layout()
+    if find_by_text(layout, '设置更大字体'):
+        click_by_text(layout, '取消', 1.0)
+        layout = dump_layout()
+
+    new_val = read_text_value_raw(layout, '字体大小')
+    return (new_val == desired), new_val
+
+
+def query_font_weight():
+    """
+    查询字体粗细 → '最细' | '标准' | '最粗' | None
+    """
+    layout = _open_font_size_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '字体粗细')
+
+
+def set_font_weight(desired):
+    """
+    设置字体粗细（用 swipe 拖动 slider）
+    desired: '最细' | '标准' | '最粗'
+    → (success, new_value)
+    """
+    layout = _open_font_size_page()
+    if not layout:
+        return False, None
+
+    # 找字体粗细 label 下方的 slider
+    comps = find_by_text_nearest(layout, '字体粗细')
+    if not comps:
+        return False, None
+    label_center = parse_bounds(attr(comps[0], 'bounds'))
+    if not label_center:
+        return False, None
+
+    target_slider = None
+    for sl in find_sliders(layout):
+        sc = parse_bounds(attr(sl, 'bounds'))
+        if sc and sc[1] > label_center[1] and abs(sc[1] - label_center[1]) < 200:
+            target_slider = sl
+            break
+    if not target_slider:
+        return False, None
+
+    fb = parse_full_bounds(attr(target_slider, 'bounds', ''))
+    if not fb:
+        return False, None
+
+    track_w = fb[2] - fb[0]
+    cy = (fb[1] + fb[3]) // 2
+    # 档位: 最细=最左, 标准=中间, 最粗=最右
+    pct_map = {'最细': 0, '标准': 50, '最粗': 100}
+    if desired not in pct_map:
+        return False, None
+
+    target_x = int(fb[0] + track_w * pct_map[desired] / 100)
+    center_x = (fb[0] + fb[2]) // 2
+    # 从 slider 中心 swipe 到目标位置
+    hdc_shell('uitest', 'uiInput', 'swipe',
+              str(center_x), str(cy), str(target_x), str(cy))
+    time.sleep(2)
+
+    layout = dump_layout()
+    new_val = read_text_value_raw(layout, '字体粗细')
+    return (new_val == desired), new_val
+
+
 # ── 朗读速度（语速）──
 
 def _navigate_to_speech_rate_page():
