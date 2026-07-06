@@ -322,6 +322,11 @@ def query_bluetooth():
     return query_setting('星闪和蓝牙', '蓝牙', 'toggle_row', scroll=2)
 
 
+def set_bluetooth(desired):
+    """开关蓝牙 → (success, new_status)"""
+    return toggle_setting('星闪和蓝牙', '蓝牙', 'toggle_row', desired, scroll=2)
+
+
 def _open_bluetooth_page():
     """打开蓝牙设置页面，等待设备列表加载"""
     restart_settings()
