@@ -134,6 +134,7 @@ def set_zoom_gesture(desired):
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
 | 放大手势 | `query_zoom_gesture()` | `set_zoom_gesture('on'/'off')` |
+| 颜色反转 | `query_color_inversion()` | `set_color_inversion('on'/'off')` |
 
 **系统**
 
@@ -246,6 +247,7 @@ ui_test_scriptss/
 ├── auto_brightness_manager.py      50行
 ├── brightness_manager.py           屏幕亮度百分比查询
 ├── font_size_manager.py            字体大小/字体粗细查询与设置
+├── color_inversion_manager.py      颜色反转开关查询与设置
 ├── query_multi_status.py           综合查询 (省电/亮度/电子书/导航)
 ├── query_default_data_card.py      40行
 ├── wlan_auto_download_manager.py   50行

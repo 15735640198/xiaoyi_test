@@ -168,6 +168,19 @@ def set_zoom_gesture(desired):
                           scroll=4, third_level_toggle='放大手势')
 
 
+# ── 颜色反转 ──
+
+def query_color_inversion():
+    """查询颜色反转状态 → 'on' | 'off' | 'unknown'"""
+    return query_setting('关怀和无障碍', '颜色反转', 'text_value', scroll=4)
+
+
+def set_color_inversion(desired):
+    """设置颜色反转 → (success, new_status)"""
+    return toggle_setting('关怀和无障碍', '颜色反转', 'text_value', desired,
+                          scroll=4, third_level_toggle='颜色反转')
+
+
 # ── 开发者模式 ──
 
 def query_developer_mode():
