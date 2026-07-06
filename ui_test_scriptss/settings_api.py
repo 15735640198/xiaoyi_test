@@ -509,7 +509,7 @@ def disconnect_bluetooth(device_name):
 
 def query_brightness():
     """
-    查询屏幕亮度百分比 → float (如 100.0) | None
+    查询屏幕亮度百分比 → int (如 100) | None
     通过 UI slider 的 text 属性读取（0-255 标度），换算为百分比。
     """
     layout = navigate_to_page('显示和亮度', 2)
@@ -520,7 +520,7 @@ def query_brightness():
             val = attr(sl, 'text', '') or attr(sl, 'originalText', '')
             if val:
                 try:
-                    return round(float(val) / 255 * 100, 1)
+                    return round(float(val) / 255 * 100)
                 except ValueError:
                     pass
         swipe_up()
