@@ -1,23 +1,24 @@
 import requests
 import json
 
-API_BASE = "https://你的内网GLM地址/v1/chat/completions"
-API_KEY = "你的key"
-MODEL = "你的模型名"
+API_BASE = "https://api.openbitfun.com/v1/chat/completions"
+API_KEY = "sk-z9yS9C0ZPyJGiCol8AzSny0lY55f3b77cQ4J4U5Y8e7lCaF5"
+MODEL = "glm-5.1"
 
-# 构造一个带 cache_control 的消息列表
-# 第1条 system 和第2条 user 都标记 cache，模拟 Claude Code 的行为
+# 填充超过 1024 tokens 的大前缀，触发 cache 最低阈值
+# 用一段长文本 + cache_control 标记，模拟 Claude Code 的 system prompt
+FILLER = "你是一个知识渊博的AI助手，通晓各领域知识。" * 200  # 约 1600+ tokens
 messages = [
     {
         "role": "system",
         "content": [
-            {"type": "text", "text": "你是一个有帮助的助手。", "cache_control": {"type": "ephemeral"}}
+            {"type": "text", "text": FILLER, "cache_control": {"type": "ephemeral"}}
         ]
     },
     {
         "role": "user",
         "content": [
-            {"type": "text", "text": "你好，请用中文回答。", "cache_control": {"type": "ephemeral"}}
+            {"type": "text", "text": "请记住以下信息：" + "数据" * 100, "cache_control": {"type": "ephemeral"}}
         ]
     },
     {
