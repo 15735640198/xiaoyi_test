@@ -1,3 +1,6 @@
 debug_explore.py
 __pycache__/
 .bitfun/
+.idea/
+*.lock
+pyproject.toml
