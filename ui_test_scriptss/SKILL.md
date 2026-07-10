@@ -120,6 +120,7 @@ def set_zoom_gesture(desired):
 | 来电铃声 | `query_ringtone()` | `set_ringtone_default()` |
 | 信息铃声 | `query_message_ringtone()` | — |
 | 通知铃声 | `query_notification_ringtone()` | — |
+| 响铃时振动 | `query_ring_vibration()` | `set_ring_vibration('on'/'off')` |
 
 **电池**
 
@@ -247,6 +248,7 @@ ui_test_scriptss/
 ├── speech_rate_manager.py          52行
 ├── lockscreen_method_manager.py    77行
 ├── ringtone_manager.py             100行 (来电/信息/通知铃声)
+├── ring_vibration_manager.py       响铃时振动开关查询与设置
 ├── hotspot_config_manager.py       75行
 ├── auto_brightness_manager.py      50行
 ├── brightness_manager.py           屏幕亮度百分比查询

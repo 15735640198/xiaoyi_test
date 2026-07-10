@@ -818,6 +818,18 @@ def set_speech_rate(value):
     return (new_val is not None and new_val != 'unknown'), new_val
 
 
+# ── 响铃时振动 ──
+
+def query_ring_vibration():
+    """查询响铃时振动状态 → 'on' | 'off' | 'unknown'"""
+    return query_setting('声音和振动', '响铃时振动', 'toggle_row', scroll=3)
+
+
+def set_ring_vibration(desired):
+    """设置响铃时振动 → (success, new_status)"""
+    return toggle_setting('声音和振动', '响铃时振动', 'toggle_row', desired, scroll=3)
+
+
 # ── 锁屏方式 ──
 
 def query_lock_screen_method():

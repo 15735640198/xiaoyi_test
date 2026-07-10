@@ -42,6 +42,7 @@ categories = [
         ("来电铃声", "query_ringtone()\nset_ringtone_default()"),
         ("信息铃声", "query_message_ringtone()"),
         ("通知铃声", "query_notification_ringtone()"),
+        ("响铃时振动", "query_ring_vibration()\nset_ring_vibration('on'/'off')"),
     ]),
     ("电池", [
         ("省电模式", "query_power_saving()\nset_power_saving('on'/'off')"),
