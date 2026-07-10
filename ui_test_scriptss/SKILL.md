@@ -269,6 +269,7 @@ ui_test_scriptss/
 ├── developer_mode_manager.py       开发者模式查询与开关（点击版本号7次/关闭总开关）
 ├── fingerprint_manager.py          指纹录入状态查询
 ├── privacy_space_manager.py        隐私空间状态查询
+├── query_current_page.py           查询当前设置页面标题
 ├── 脚本生成失败说明.md             无法生成的功能及原因
 ├── HarmonyOS设置功能知识库.md       知识库 v5 (15章, 1527行)
 └── SKILL.md                        本文件

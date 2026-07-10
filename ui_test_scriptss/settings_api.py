@@ -143,6 +143,42 @@ def query_subpage_toggle(entry, target, scroll=4):
 # 专用 API — 每个设置项一组函数，封装具体参数
 # ═══════════════════════════════════════════════════════════════
 
+# ── 当前设置页面标题 ──
+
+def query_current_settings_page():
+    """
+    查询当前设置页面的标题 → str | None
+
+    如果当前不在设置App中，返回 None。
+    否则返回页面标题文本（如 '声音和振动'、'字体大小和界面缩放'）。
+    """
+    layout = dump_layout()
+    if not layout:
+        return None
+
+    # 检查是否在设置App中
+    settings_nodes = find_components(
+        layout, lambda c: 'settings' in attr(c, 'bundleName', ''))
+    if not settings_nodes:
+        return None
+
+    # 查找页面标题: 状态栏(y<117)以下、标题区域(y 130~250)的 Text 组件
+    title_candidates = []
+    for c in find_components(layout, lambda c: attr(c, 'type', '') == 'Text'):
+        txt = attr(c, 'text', '') or attr(c, 'originalText', '')
+        if not txt:
+            continue
+        b = parse_full_bounds(attr(c, 'bounds', ''))
+        if b and 130 < b[1] < 250:
+            title_candidates.append((b[1], txt))
+
+    if title_candidates:
+        title_candidates.sort(key=lambda x: x[0])
+        return title_candidates[0][1]
+
+    return None
+
+
 # ── 勿扰模式 ──
 
 def query_dnd():
