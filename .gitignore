@@ -4,3 +4,4 @@ __pycache__/
 .idea/
 *.lock
 pyproject.toml
+layout_dump.json

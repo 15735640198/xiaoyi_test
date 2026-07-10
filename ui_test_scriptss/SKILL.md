@@ -118,6 +118,8 @@ def set_zoom_gesture(desired):
 |--------|---------|---------|
 | 朗读速度 | `query_speech_rate()` | `set_speech_rate(value)` |
 | 来电铃声 | `query_ringtone()` | `set_ringtone_default()` |
+| 信息铃声 | `query_message_ringtone()` | — |
+| 通知铃声 | `query_notification_ringtone()` | — |
 
 **电池**
 
@@ -244,7 +246,7 @@ ui_test_scriptss/
 ├── bluetooth_manager.py            64行
 ├── speech_rate_manager.py          52行
 ├── lockscreen_method_manager.py    77行
-├── ringtone_manager.py             70行
+├── ringtone_manager.py             100行 (来电/信息/通知铃声)
 ├── hotspot_config_manager.py       75行
 ├── auto_brightness_manager.py      50行
 ├── brightness_manager.py           屏幕亮度百分比查询

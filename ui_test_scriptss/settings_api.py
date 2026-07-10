@@ -859,21 +859,22 @@ def query_lock_screen_method():
     return result
 
 
-# ── 来电铃声 ──
+# ── 铃声（来电、信息、通知）──
 
-def _navigate_to_ringtone_page():
+def _navigate_to_ringtone_selection(item_text='来电铃声'):
     """
-    导航到来电铃声选择页: 设置 > 声音和振动 > 来电铃声
+    导航到铃声选择页: 设置 > 声音和振动 > {item_text}
+    item_text: '来电铃声' | '信息铃声' | '通知铃声'
     返回: 页面 layout 或 None
     """
     layout = navigate_to_page('声音和振动', 3)
     if not layout:
         return None
-    if not click_by_text(layout, '来电铃声', 2.5):
+    if not click_by_text(layout, item_text, 2.5):
         for _ in range(3):
             swipe_up()
             layout = dump_layout()
-            if click_by_text(layout, '来电铃声', 2.5):
+            if click_by_text(layout, item_text, 2.5):
                 break
         else:
             return None
@@ -898,7 +899,7 @@ def query_ringtone():
         {'sim1': {'name': str, 'is_default': bool}, 'sim2': {...}}  (双卡)
         {'default': {'name': str, 'is_default': bool}}              (单卡/无卡)
     """
-    layout = _navigate_to_ringtone_page()
+    layout = _navigate_to_ringtone_selection('来电铃声')
     if not layout:
         return None
 
@@ -922,7 +923,7 @@ def set_ringtone_default():
     设置来电铃声为默认铃声
     返回: (success: bool, results: dict)
     """
-    layout = _navigate_to_ringtone_page()
+    layout = _navigate_to_ringtone_selection('来电铃声')
     if not layout:
         return False, None
 
@@ -965,6 +966,34 @@ def set_ringtone_default():
             all_success = False
 
     return all_success, results
+
+
+def query_message_ringtone():
+    """
+    查询信息铃声是否为默认铃声 → dict | None
+
+    返回:
+        {'name': str, 'is_default': bool}
+    """
+    layout = _navigate_to_ringtone_selection('信息铃声')
+    if not layout:
+        return None
+    name, is_default = _get_checked_ringtone(layout)
+    return {'name': name, 'is_default': is_default}
+
+
+def query_notification_ringtone():
+    """
+    查询通知铃声是否为默认铃声 → dict | None
+
+    返回:
+        {'name': str, 'is_default': bool}
+    """
+    layout = _navigate_to_ringtone_selection('通知铃声')
+    if not layout:
+        return None
+    name, is_default = _get_checked_ringtone(layout)
+    return {'name': name, 'is_default': is_default}
 
 
 # ── 热点配置（名称、密码、加密方式）──
