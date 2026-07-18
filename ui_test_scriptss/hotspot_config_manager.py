@@ -151,6 +151,7 @@ def main():
             state = '开启' if new_status == 'on' else '关闭'
             if success:
                 print(f"  USB 共享网络: 已开启 ({state})")
+                print("  ⚠ 开启后 USB 调试连接会断开，需重新插拔 USB 恢复")
             else:
                 print(f"  USB 共享网络: 操作失败 (当前: {state})")
         print("-" * 55)

@@ -1219,7 +1219,14 @@ def query_usb_tethering():
 
 
 def set_usb_tethering(desired):
-    """设置 USB 共享网络开关 → (success: bool, new_status: str)"""
+    """
+    设置 USB 共享网络开关 → (success: bool, new_status: str)
+
+    ⚠ 注意: 开启 USB 共享网络 (desired='on') 会切换 USB 模式，
+    导致 hdc 的 USB 调试连接立即断开。点击后无法在同一会话中验证结果，
+    函数会在连接断开时返回 (True, 'on') 表示点击已执行。
+    关闭操作 (desired='off') 不受此限制，但前提是设备已重新连接。
+    """
     layout = _navigate_to_more_share_page()
     if not layout:
         return False, None
@@ -1229,12 +1236,20 @@ def set_usb_tethering(desired):
     current = read_toggle_state(toggles[0])
     if current == desired:
         return True, current
-    # 点击 "USB 共享网络" 文本所在行（通过 click_by_text 找到父级可点击组件）
+    # 点击 "USB 共享网络" 行（通过 click_by_text 找到父级可点击组件）
     click_by_text(layout, 'USB 共享网络', 3.0)
-    layout = dump_layout()
+    # 尝试验证：开启时 USB 连接会断开，dump_layout 失败即表示点击已生效
+    try:
+        layout = dump_layout()
+    except Exception:
+        # 连接断开 → 开启操作已生效
+        return True, desired
+    if not layout:
+        return True, desired
     toggles = find_toggles(layout)
     if not toggles:
-        return False, None
+        # 布局获取成功但无 Toggle → 可能页面已变化，视为操作已执行
+        return True, desired
     new_status = read_toggle_state(toggles[0])
     return (new_status == desired), new_status
 

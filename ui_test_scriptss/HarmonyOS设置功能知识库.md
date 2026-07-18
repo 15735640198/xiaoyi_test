@@ -225,6 +225,7 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 - **加密方式**: 不在页面上，HarmonyOS 热点加密固定为 WPA2-PSK，不可配置
 - **状态判断**: Toggle 的 `checked` 属性
 - **关键注意**: Toggle 可能与"个人热点"文本是两个独立组件，需按坐标距离关联匹配
+- **USB 共享网络限制**: 开启 USB 共享网络会切换 USB 连接模式，导致 hdc 的 USB 调试连接立即断开。`set_usb_tethering('on')` 点击后无法在同一会话中验证结果，函数在连接断开时返回 `(True, 'on')` 表示点击已执行。关闭操作不受此限制，但前提是设备已重新连接。
 
 **文本输入方法**（设置名称/密码时使用）:
 1. 点击 text_value 项 → 弹出对话框，含 TextInput（type=TextInput）+ "确定"按钮
