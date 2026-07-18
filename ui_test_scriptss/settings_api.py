@@ -1236,19 +1236,24 @@ def set_usb_tethering(desired):
     current = read_toggle_state(toggles[0])
     if current == desired:
         return True, current
-    # 点击 "USB 共享网络" 行（通过 click_by_text 找到父级可点击组件）
-    click_by_text(layout, 'USB 共享网络', 3.0)
-    # 尝试验证：开启时 USB 连接会断开，dump_layout 失败即表示点击已生效
-    try:
-        layout = dump_layout()
-    except Exception:
-        # 连接断开 → 开启操作已生效
+    # 直接点击 Toggle 中心（点击 Row 中心不会触发 Toggle）
+    center = parse_bounds(attr(toggles[0], 'bounds', ''))
+    if center:
+        click_at(center[0], center[1], 3.0)
+    # 点击后检测设备是否仍然连接（开启 USB 共享会断开 USB 调试连接）
+    import subprocess
+    r = subprocess.run(['hdc', 'list', 'targets'], capture_output=True, text=True,
+                       timeout=10, encoding='utf-8', errors='replace')
+    device_list = (r.stdout or '') + (r.stderr or '')
+    if 'Empty' in device_list or not device_list.strip():
+        # 设备已断连 → 开启操作已生效
         return True, desired
+    # 设备仍连接 → 正常验证结果
+    layout = dump_layout()
     if not layout:
         return True, desired
     toggles = find_toggles(layout)
     if not toggles:
-        # 布局获取成功但无 Toggle → 可能页面已变化，视为操作已执行
         return True, desired
     new_status = read_toggle_state(toggles[0])
     return (new_status == desired), new_status
