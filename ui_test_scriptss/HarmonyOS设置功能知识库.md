@@ -215,11 +215,11 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 
 | 子项 | 形态 | 状态/操作说明 |
 |------|------|------------|
-| 个人热点 | toggle_row | Toggle checked → ON/OFF |
+| 个人热点 | toggle_row | Toggle checked → ON/OFF；Toggle 无文本，id=`...hotspot_switch_setting.result` |
 | 设备名称 | text_value | 右侧显示热点名称；点击弹出对话框（TextInput + "确定"按钮） |
 | 密码 | text_value | 右侧显示密码明文；点击弹出对话框（TextInput + "确定"按钮） |
-| 已连接设备 | text_value | 右侧显示连接数（如"0 台"） |
-| 更多共享设置 | nav_item | 子页面: 单次流量限制(text_value) + AP频段(text_value) + USB共享网络 |
+| 已连接设备 | text_value | 右侧显示连接数（如"0 台"），id=`...connected_device_entry.result` |
+| 更多共享设置 | nav_item | 子页面: 单次流量限制(text_value) + AP频段(text_value, id=`...ApBand.UpdateApBand.result`) + USB共享网络(toggle_row, id=`...hotspot_device_usb.result`) |
 | 关于 | nav_item | — |
 
 - **加密方式**: 不在页面上，HarmonyOS 热点加密固定为 WPA2-PSK，不可配置

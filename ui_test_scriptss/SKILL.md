@@ -88,8 +88,11 @@ def set_zoom_gesture(desired):
 | 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
 | 星闪 | `query_nearlink()` | `set_nearlink('on'/'off')` |
 | 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
-| 个人热点 | `query_personal_hotspot()` | — |
+| 个人热点 | `query_personal_hotspot()` | `set_personal_hotspot('on'/'off')` |
 | 热点配置 | `query_hotspot_config()` | `set_hotspot_name(name)` / `set_hotspot_password(pwd)` |
+| 已连接设备 | `query_hotspot_connected_devices()` | — |
+| AP 频段 | `query_hotspot_ap_band()` | — |
+| USB 共享网络 | `query_usb_tethering()` | `set_usb_tethering('on'/'off')` |
 | 网络加速 | `query_network_acceleration()` | `set_network_acceleration('on'/'off')` |
 | NFC | `query_nfc()` | `set_nfc('on'/'off')` |
 | 默认付款应用 | `query_default_payment_app()` | `set_default_payment_app(app_name)` |

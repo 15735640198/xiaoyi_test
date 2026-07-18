@@ -306,8 +306,36 @@ def query_developer_mode():
 # ── 个人热点 ──
 
 def query_personal_hotspot():
-    """查询个人热点状态 → 'on' | 'off' | 'unknown'"""
-    return query_subpage_toggle('移动网络', '个人热点', scroll=1)
+    """查询个人热点开关状态 → 'on' | 'off' | 'unknown'"""
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return None
+    toggles = find_toggles(layout)
+    if not toggles:
+        return 'unknown'
+    return read_toggle_state(toggles[0])
+
+
+def set_personal_hotspot(desired):
+    """设置个人热点开关 → (success: bool, new_status: str)"""
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return False, None
+    toggles = find_toggles(layout)
+    if not toggles:
+        return False, None
+    current = read_toggle_state(toggles[0])
+    if current == desired:
+        return True, current
+    center = parse_bounds(attr(toggles[0], 'bounds', ''))
+    if center:
+        click_at(center[0], center[1], 2.5)
+    layout = dump_layout()
+    toggles = find_toggles(layout)
+    if not toggles:
+        return False, None
+    new_status = read_toggle_state(toggles[0])
+    return (new_status == desired), new_status
 
 
 # ── 省电模式 ──
@@ -1139,6 +1167,76 @@ def set_hotspot_password(password):
     layout = dump_layout()
     new_pwd = read_text_value_raw(layout, '密码')
     return (new_pwd == password), new_pwd
+
+
+def query_hotspot_connected_devices():
+    """
+    查询已连接热点设备数量 → str | None
+    返回如 '0 台'
+    """
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, '已连接设备')
+
+
+def _navigate_to_more_share_page():
+    """
+    导航到更多共享设置子页面: 设置 > 移动网络 > 个人热点 > 更多共享设置
+    返回: 页面 layout 或 None
+    """
+    layout = _navigate_to_hotspot_page()
+    if not layout:
+        return None
+    if not click_by_text(layout, '更多共享设置', 2.5):
+        swipe_up()
+        layout = dump_layout()
+        if not click_by_text(layout, '更多共享设置', 2.5):
+            return None
+    return dump_layout()
+
+
+def query_hotspot_ap_band():
+    """
+    查询热点 AP 频段 → str | None
+    返回如 '2.4 GHz 频段'、'5 GHz 频段'
+    """
+    layout = _navigate_to_more_share_page()
+    if not layout:
+        return None
+    return read_text_value_raw(layout, 'AP 频段')
+
+
+def query_usb_tethering():
+    """查询 USB 共享网络开关状态 → 'on' | 'off' | 'unknown'"""
+    layout = _navigate_to_more_share_page()
+    if not layout:
+        return None
+    toggles = find_toggles(layout)
+    if not toggles:
+        return 'unknown'
+    return read_toggle_state(toggles[0])
+
+
+def set_usb_tethering(desired):
+    """设置 USB 共享网络开关 → (success: bool, new_status: str)"""
+    layout = _navigate_to_more_share_page()
+    if not layout:
+        return False, None
+    toggles = find_toggles(layout)
+    if not toggles:
+        return False, None
+    current = read_toggle_state(toggles[0])
+    if current == desired:
+        return True, current
+    # 点击 "USB 共享网络" 文本所在行（通过 click_by_text 找到父级可点击组件）
+    click_by_text(layout, 'USB 共享网络', 3.0)
+    layout = dump_layout()
+    toggles = find_toggles(layout)
+    if not toggles:
+        return False, None
+    new_status = read_toggle_state(toggles[0])
+    return (new_status == desired), new_status
 
 
 # ── 自动调节亮度 ──
