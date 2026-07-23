@@ -5,3 +5,4 @@ __pycache__/
 *.lock
 pyproject.toml
 layout_dump.json
+opencode-scripts/sessions_export/

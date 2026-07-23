@@ -63,8 +63,7 @@ def export_one_session(conn, sess, out_dir):
     session_id = sess["id"]
     slug = sess["slug"] or "untitled"
     title = sess["title"] or "Untitled"
-    ts = datetime.fromtimestamp(sess["time_created"] / 1000).strftime("%Y%m%d_%H%M%S")
-    filename = f"{ts}_{slug}.jsonl"
+    filename = f"{session_id}.jsonl"
     filepath = out_dir / filename
 
     # session 元信息行
