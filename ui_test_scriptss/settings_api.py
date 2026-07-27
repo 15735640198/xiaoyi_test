@@ -1678,6 +1678,201 @@ def set_sim_enabled(card, desired):
     return (new_status == desired), new_status
 
 
+# ── 应用流量使用量 ──
+
+def _navigate_to_traffic_ranking():
+    """
+    导航到流量排行页面: 设置 > 移动网络 > 流量管理 > 更多
+    返回: 流量排行页面 layout 或 None
+    """
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return None
+    # 找流量管理
+    if not click_by_text(layout, '流量管理', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '流量管理', 2.5):
+                break
+        else:
+            return None
+    # 点击"更多"按钮
+    layout = dump_layout()
+    if not click_by_text(layout, '更多', 2.5):
+        return None
+    return dump_layout()
+
+
+def _click_wlan_tab(layout):
+    """在流量排行页面点击 WLAN 标签"""
+    wlan_texts = find_components(layout, lambda c: 'WLAN' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+    if wlan_texts:
+        b = parse_full_bounds(attr(wlan_texts[0], 'bounds', ''))
+        if b:
+            cx = (b[0] + b[2]) // 2
+            cy = (b[1] + b[3]) // 2
+            click_at(cx, cy, 2.5)
+            return dump_layout()
+    return layout
+
+
+def _find_and_click_app_in_ranking(layout, app_name, max_scroll=10):
+    """在流量排行列表中查找并点击指定应用"""
+    for i in range(max_scroll + 1):
+        # 找应用名 Text
+        for c in find_components(layout, lambda c: attr(c, 'type', '') == 'Text'):
+            txt = attr(c, 'text', '') or attr(c, 'originalText', '')
+            if txt == app_name:
+                b = parse_bounds(attr(c, 'bounds', ''))
+                if b and b[1] > 300:
+                    click_at(b[0], b[1], 2.5)
+                    return dump_layout()
+        if i < max_scroll:
+            swipe_up()
+            time.sleep(1)
+            layout = dump_layout()
+            if not layout:
+                break
+    return None
+
+
+def _read_usage_number(layout):
+    """
+    从详情页面读取流量使用量数字和单位
+    查找含"已使用流量"的 Column，从中提取数字和单位
+    返回: '5.65 GB' 或 None
+    """
+    # 找 "已使用流量" 文本（限定 Text 类型，避免匹配 Column 等容器）
+    label_texts = find_components(layout, lambda c: attr(c, 'type', '') == 'Text' and '已使用流量' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+    if not label_texts:
+        return None
+    label_bounds = parse_bounds(attr(label_texts[0], 'bounds', ''))
+    if not label_bounds:
+        return None
+
+    # 找附近的数字和单位文本（在"已使用流量"上方，同一区域）
+    candidates = []
+    for c in find_components(layout, lambda c: attr(c, 'type', '') == 'Text'):
+        txt = attr(c, 'text', '') or attr(c, 'originalText', '')
+        if not txt or '已使用' in txt or '流量' in txt:
+            continue
+        b = parse_bounds(attr(c, 'bounds', ''))
+        if not b:
+            continue
+        # 在"已使用流量"上方 200px 内
+        if b[1] < label_bounds[1] and (label_bounds[1] - b[1]) < 200:
+            candidates.append((b[1], txt, b))
+
+    if not candidates:
+        return None
+
+    # 按 Y 坐标排序，数字在上、单位在下（或同行右侧）
+    candidates.sort(key=lambda x: x[0])
+    number = candidates[0][1]  # 最上面的 = 数字
+    unit = None
+    if len(candidates) > 1:
+        unit = candidates[1][1]  # 第二个 = 单位
+
+    # 如果数字本身包含单位（如 "5.38 GB"），直接返回
+    if any(u in number for u in ('GB', 'MB', 'KB', 'B')):
+        return number
+    if unit and any(u in unit for u in ('GB', 'MB', 'KB', 'B')):
+        return f"{number} {unit}"
+    return number
+
+
+def _select_time_period(layout, period):
+    """
+    选择时间周期: '30d' → 最近 30 天, '24h' → 最近 24 小时
+    返回: 更新后的 layout
+    """
+    current_period = '30d'
+    # 检查当前周期
+    period_texts = find_components(layout, lambda c: '最近' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+    if period_texts:
+        current_txt = attr(period_texts[0], 'text', '') or attr(period_texts[0], 'originalText', '')
+        if '24' in current_txt:
+            current_period = '24h'
+
+    if period == current_period:
+        return layout  # 已是目标周期
+
+    # 点击周期选择器
+    if period_texts:
+        b = parse_full_bounds(attr(period_texts[0], 'bounds', ''))
+        if b:
+            cx = (b[0] + b[2]) // 2
+            cy = (b[1] + b[3]) // 2
+            click_at(cx, cy, 2.0)
+
+    # 点击目标选项
+    layout = dump_layout()
+    if not layout:
+        return None
+    target_text = '最近 24 小时' if period == '24h' else '最近 30 天'
+    menu_items = find_components(layout, lambda c: attr(c, 'type', '') == 'MenuItem')
+    for item in menu_items:
+        txt = attr(item, 'text', '') or attr(item, 'originalText', '')
+        if target_text in txt:
+            b = parse_bounds(attr(item, 'bounds', ''))
+            if b:
+                click_at(b[0], b[1], 2.5)
+                break
+    else:
+        # MenuItem 没找到，尝试用文本点击
+        click_by_text(layout, target_text, 2.5)
+
+    return dump_layout()
+
+
+def query_app_data_usage(app_name, period='30d'):
+    """
+    查询指定应用的数据流量使用量 → dict | None
+
+    Args:
+        app_name: 应用名称（如 '应用市场'）
+        period: '30d'（最近30天，默认）或 '24h'（最近24小时）
+
+    返回:
+        {'app': '应用市场', 'usage': '5.65 GB', 'period': '最近 30 天'}
+    """
+    # 导航到流量排行
+    layout = _navigate_to_traffic_ranking()
+    if not layout:
+        return None
+
+    # 点击 WLAN 标签
+    layout = _click_wlan_tab(layout)
+    if not layout:
+        return None
+
+    # 查找并点击指定应用
+    detail_layout = _find_and_click_app_in_ranking(layout, app_name)
+    if not detail_layout:
+        return None
+
+    # 选择时间周期
+    detail_layout = _select_time_period(detail_layout, period)
+    if not detail_layout:
+        return None
+
+    # 读取流量数据
+    usage = _read_usage_number(detail_layout)
+
+    # 读取当前周期文本
+    period_texts = find_components(detail_layout, lambda c: '最近' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+    period_label = ''
+    if period_texts:
+        period_label = attr(period_texts[0], 'text', '') or attr(period_texts[0], 'originalText', '')
+
+    return {
+        'app': app_name,
+        'usage': usage,
+        'period': period_label
+    }
+
+
 # ── 网络加速 ──
 
 def query_network_acceleration():
