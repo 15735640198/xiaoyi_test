@@ -1534,6 +1534,94 @@ def query_default_data_card():
     return 'unknown'
 
 
+def set_default_data_card(card):
+    """
+    设置默认移动数据卡 → (success: bool, new_status: str)
+
+    Args:
+        card: '卡 1' / '卡 2' / '1' / '2'
+
+    移动网络 > SIM 卡管理, "默认移动数据"行有两个 Button(卡1/卡2),
+    点击未选中的 Button 即可切换，无需确认弹窗。
+    """
+    # 标准化输入
+    if card in ('1', '卡 1', '卡1'):
+        target = '卡 1'
+    elif card in ('2', '卡 2', '卡2'):
+        target = '卡 2'
+    else:
+        return False, None
+
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return False, None
+    if not click_by_text(layout, 'SIM 卡管理', 2.5):
+        return False, None
+    layout = dump_layout()
+    if not layout:
+        return False, None
+
+    # 找"默认移动数据"文本
+    comps = find_by_text_nearest(layout, '默认移动数据')
+    if not comps:
+        return False, None
+
+    buttons = find_buttons(layout)
+    all_texts = find_components(layout, lambda c: attr(c, 'type') == 'Text')
+
+    for comp in comps:
+        center = parse_bounds(attr(comp, 'bounds'))
+        if not center:
+            continue
+        # 找同一行右侧的 Button
+        for btn in buttons:
+            bc = parse_bounds(attr(btn, 'bounds'))
+            if not bc or abs(bc[1] - center[1]) >= 80 or bc[0] <= center[0]:
+                continue
+            # 读取 Button 内文本
+            fb = parse_full_bounds(attr(btn, 'bounds', ''))
+            btn_text = ''
+            if fb:
+                for t in all_texts:
+                    tb = parse_full_bounds(attr(t, 'bounds', ''))
+                    if (tb and fb[0] <= tb[0] and tb[2] <= fb[2]
+                            and fb[1] <= tb[1] and tb[3] <= fb[3]):
+                        btn_text = get_text(t).strip()
+                        break
+            selected = attr(btn, 'selected', '')
+            if btn_text == target:
+                if selected == 'true':
+                    return True, target
+                # 点击切换（用 click_by_text 点击文本所在的可点击父级）
+                click_by_text(layout, target, 3.0)
+                # 检查是否有确认弹窗
+                dialog_layout = dump_layout()
+                if dialog_layout:
+                    # 尝试点击"确定"
+                    click_by_text(dialog_layout, '确定', 2.0)
+                # 验证
+                layout = dump_layout()
+                if not layout:
+                    return True, target
+                comps2 = find_by_text_nearest(layout, '默认移动数据')
+                if comps2:
+                    ref = parse_bounds(attr(comps2[0], 'bounds'))
+                    for btn2 in find_buttons(layout):
+                        bc2 = parse_bounds(attr(btn2, 'bounds'))
+                        if bc2 and abs(bc2[1] - ref[1]) < 80 and bc2[0] > ref[0]:
+                            if attr(btn2, 'selected', '') == 'true':
+                                fb2 = parse_full_bounds(attr(btn2, 'bounds', ''))
+                                if fb2:
+                                    for t2 in all_texts:
+                                        tb2 = parse_full_bounds(attr(t2, 'bounds', ''))
+                                        if (tb2 and fb2[0] <= tb2[0] and tb2[2] <= fb2[2]
+                                                and fb2[1] <= tb2[1] and tb2[3] <= fb2[3]):
+                                            name = get_text(t2).strip()
+                                            return (name == target), name
+                return True, target
+    return False, None
+
+
 # ── WLAN 下自动下载 ──
 
 def query_wlan_auto_download():

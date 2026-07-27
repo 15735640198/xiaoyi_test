@@ -29,7 +29,7 @@ categories = [
         ("默认付款应用", "query_default_payment_app()\nset_default_payment_app(app_name)"),
     ]),
     ("移动网络与SIM卡", [
-        ("默认数据卡", "query_default_data_card()"),
+        ("默认数据卡", "query_default_data_card()\nset_default_data_card('1'/'2')"),
         ("SIM卡状态", "query_sim_status()\nquery_sim_carrier()"),
         ("SIM卡使用状态", "query_sim_enabled(card)\nset_sim_enabled(card, 'on'/'off')"),
         ("应用联网", "query_app_network_access(app_name)\nset_app_network_access(app_name, type, 'on'/'off')"),

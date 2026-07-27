@@ -101,7 +101,7 @@ def set_zoom_gesture(desired):
 
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
-| 默认数据卡 | `query_default_data_card()` | — |
+| 默认数据卡 | `query_default_data_card()` | `set_default_data_card('1'/'2')` |
 | SIM卡状态 | `query_sim_status()` / `query_sim_carrier()` | — |
 | SIM卡使用状态 | `query_sim_enabled(card)` | `set_sim_enabled(card, 'on'/'off')` |
 | 应用联网 | `query_app_network_access(app_name)` | `set_app_network_access(app_name, type, 'on'/'off')` |
