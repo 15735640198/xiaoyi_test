@@ -32,6 +32,7 @@ categories = [
         ("默认数据卡", "query_default_data_card()"),
         ("SIM卡状态", "query_sim_status()\nquery_sim_carrier()"),
         ("SIM卡使用状态", "query_sim_enabled(card)\nset_sim_enabled(card, 'on'/'off')"),
+        ("应用联网", "query_app_network_access(app_name)\nset_app_network_access(app_name, type, 'on'/'off')"),
     ]),
     ("显示与亮度", [
         ("屏幕亮度", "query_brightness() →百分比"),

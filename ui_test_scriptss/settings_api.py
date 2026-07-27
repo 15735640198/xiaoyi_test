@@ -1259,6 +1259,191 @@ def set_usb_tethering(desired):
     return (new_status == desired), new_status
 
 
+# ── 应用联网 ──
+
+def _navigate_to_app_network_page():
+    """
+    导航到应用联网页面: 设置 > 移动网络 > 流量管理 > 应用联网
+    返回: 页面 layout 或 None
+    """
+    layout = navigate_to_page('移动网络', 1)
+    if not layout:
+        return None
+    # 找流量管理
+    if not click_by_text(layout, '流量管理', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '流量管理', 2.5):
+                break
+        else:
+            return None
+    # 找应用联网
+    layout = dump_layout()
+    if not click_by_text(layout, '应用联网', 2.5):
+        for _ in range(3):
+            swipe_up()
+            layout = dump_layout()
+            if click_by_text(layout, '应用联网', 2.5):
+                break
+        else:
+            return None
+    return dump_layout()
+
+
+def _find_app_toggle(layout, app_name):
+    """
+    在应用联网页面查找指定应用的 Toggle
+    通过 Y 坐标匹配 app_name 文本和最近的 Toggle
+    返回: (toggle_node, app_text_node) 或 (None, None)
+    """
+    # 找所有 Text 组件（排除过长文本和状态栏）
+    texts = []
+    for c in find_components(layout, lambda c: attr(c, 'type', '') == 'Text'):
+        txt = attr(c, 'text', '') or attr(c, 'originalText', '')
+        if txt and len(txt) <= 20:
+            b = parse_bounds(attr(c, 'bounds', ''))
+            if b and b[1] > 300:  # 排除状态栏和标签
+                texts.append((c, txt, b))
+
+    # 找所有 Toggle
+    toggles = find_toggles(layout)
+
+    # 精确匹配应用名
+    for t_node, txt, tb in texts:
+        if txt == app_name:
+            # 找 Y 坐标最近的 Toggle
+            best_tg = None
+            best_dy = 999
+            for tg in toggles:
+                tc = parse_bounds(attr(tg, 'bounds', ''))
+                if tc:
+                    dy = abs(tc[1] - tb[1])
+                    if dy < best_dy and dy < 80:
+                        best_dy = dy
+                        best_tg = tg
+            if best_tg:
+                return best_tg, t_node
+
+    # 子串匹配（精确匹配失败时）
+    for t_node, txt, tb in texts:
+        if app_name in txt and txt != '全部':
+            best_tg = None
+            best_dy = 999
+            for tg in toggles:
+                tc = parse_bounds(attr(tg, 'bounds', ''))
+                if tc:
+                    dy = abs(tc[1] - tb[1])
+                    if dy < best_dy and dy < 80:
+                        best_dy = dy
+                        best_tg = tg
+            if best_tg:
+                return best_tg, t_node
+
+    return None, None
+
+
+def _find_app_toggle_with_scroll(layout, app_name, max_scroll=10):
+    """查找应用 Toggle，找不到则滚动"""
+    for i in range(max_scroll + 1):
+        tg, txt = _find_app_toggle(layout, app_name)
+        if tg:
+            return tg, txt, layout
+        if i < max_scroll:
+            swipe_up()
+            time.sleep(1)
+            layout = dump_layout()
+            if not layout:
+                break
+    return None, None, layout
+
+
+def query_app_network_access(app_name):
+    """
+    查询指定应用的联网状态 → dict | None
+
+    返回:
+        {'mobile_data': 'on' | 'off' | 'unknown',
+         'wlan': 'on' | 'off' | 'unknown'}
+    """
+    layout = _navigate_to_app_network_page()
+    if not layout:
+        return None
+
+    # 移动数据标签（默认）
+    tg, txt, layout = _find_app_toggle_with_scroll(layout, app_name)
+    mobile_status = read_toggle_state(tg) if tg else 'unknown'
+
+    # 点击 WLAN 标签
+    wlan_texts = find_components(layout, lambda c: 'WLAN' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+    if wlan_texts:
+        b = parse_full_bounds(attr(wlan_texts[0], 'bounds', ''))
+        if b:
+            cx = (b[0] + b[2]) // 2
+            cy = (b[1] + b[3]) // 2
+            click_at(cx, cy, 2.5)
+    layout = dump_layout()
+    if not layout:
+        return {'mobile_data': mobile_status, 'wlan': 'unknown'}
+
+    # WLAN 标签下查找应用（可能需要从头滚动）
+    tg2, txt2, layout = _find_app_toggle_with_scroll(layout, app_name)
+    wlan_status = read_toggle_state(tg2) if tg2 else 'unknown'
+
+    return {'mobile_data': mobile_status, 'wlan': wlan_status}
+
+
+def set_app_network_access(app_name, network_type, desired):
+    """
+    设置指定应用的联网开关 → (success: bool, new_status: str)
+
+    Args:
+        app_name: 应用名称（如 '备忘录'）
+        network_type: 'mobile_data' 或 'wlan'
+        desired: 'on' 或 'off'
+    """
+    layout = _navigate_to_app_network_page()
+    if not layout:
+        return False, None
+
+    # 如果是 WLAN，先切换标签
+    if network_type == 'wlan':
+        wlan_texts = find_components(layout, lambda c: 'WLAN' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+        if wlan_texts:
+            b = parse_full_bounds(attr(wlan_texts[0], 'bounds', ''))
+            if b:
+                cx = (b[0] + b[2]) // 2
+                cy = (b[1] + b[3]) // 2
+                click_at(cx, cy, 2.5)
+        layout = dump_layout()
+        if not layout:
+            return False, None
+
+    # 查找应用 Toggle
+    tg, txt, layout = _find_app_toggle_with_scroll(layout, app_name)
+    if not tg:
+        return False, None
+
+    current = read_toggle_state(tg)
+    if current == desired:
+        return True, current
+
+    # 点击 Toggle 中心
+    center = parse_bounds(attr(tg, 'bounds', ''))
+    if center:
+        click_at(center[0], center[1], 2.5)
+
+    # 验证
+    layout = dump_layout()
+    if not layout:
+        return True, desired
+    tg2, txt2, layout = _find_app_toggle_with_scroll(layout, app_name, max_scroll=3)
+    if not tg2:
+        return True, desired
+    new_status = read_toggle_state(tg2)
+    return (new_status == desired), new_status
+
+
 # ── 自动调节亮度 ──
 
 def query_auto_brightness():

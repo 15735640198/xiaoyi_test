@@ -258,7 +258,7 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 
 | 子项 | 形态 | 状态/操作说明 |
 |------|------|------------|
-| 应用联网 | nav_item | 进入应用联网设置 |
+| 应用联网 | nav_item | 进入应用联网设置：两个标签（移动数据/WLAN），每个标签下有"全部"Toggle + 各应用Toggle，Toggle checked → ON/OFF；应用名 Text 与 Toggle 按 Y 坐标匹配（dy<80）；列表按字母排序，可滚动 |
 | 本月数据流量排行 | section_header + "更多"按钮 | 数据流量排行列表 |
 
 - **注意**: 无"剩余流量"信息。剩余流量是运营商业务数据，不在设置 App 中显示。
