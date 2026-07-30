@@ -86,6 +86,7 @@ def set_zoom_gesture(desired):
 | WLAN下自动下载 | `query_wlan_auto_download()` | `set_wlan_auto_download('on'/'off')` |
 | 蓝牙开关 | `query_bluetooth()` | `set_bluetooth('on'/'off')` |
 | 蓝牙设备 | `query_bluetooth_device(name)` | `connect_bluetooth(name)` / `disconnect_bluetooth(name)` |
+| 蓝牙本机名称 | `query_bluetooth_name()` | `set_bluetooth_name(name)` |
 | 星闪 | `query_nearlink()` | `set_nearlink('on'/'off')` |
 | 飞行模式 | `query_flight_mode()` | `set_flight_mode('on'/'off')` |
 | 个人热点 | `query_personal_hotspot()` | `set_personal_hotspot('on'/'off')` |
@@ -249,7 +250,7 @@ ui_test_scriptss/
 ├── query_personal_hotspot_state.py 37行
 ├── query_developer_mode_state.py   36行
 ├── dnd_manager.py                  48行
-├── bluetooth_manager.py            64行
+├── bluetooth_manager.py            蓝牙开关/设备/本机名称
 ├── speech_rate_manager.py          52行
 ├── lockscreen_method_manager.py    77行
 ├── ringtone_manager.py             100行 (来电/信息/通知铃声)

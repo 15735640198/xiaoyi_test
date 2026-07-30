@@ -148,7 +148,7 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 |------|------|------------|------|
 | 星闪 | toggle_row | checked=true → ON | |
 | 蓝牙 | toggle_row | checked=true → ON | |
-| 设备名称 | nav_item | 点击修改名称 | |
+| 设备名称 | text_value (可点击Span) | 点击'修改设备名称'部分弹出对话框 | Text 组件内容为`可被附近的设备发现为"xxx"，修改设备名称`，整段 `clickable=true` 但只有末尾'修改设备名称'区域可触发弹窗。需通过估算前缀文本宽度定位点击坐标（中文字宽=行高，ASCII字宽=行高/2） |
 | 已配对设备 | section_header | — | 下方是已配对设备列表 |
 | <设备名> | nav_item | 旁边有"已连接"文本=已连接 | 点击连接/断开 |
 | 其他设备 | section_header | — | 下方是未配对设备列表 |
@@ -157,6 +157,7 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 - **弹窗处理**:
   - 配对新设备时弹配对确认框，有 `配对` 和 `取消` 按钮
   - 配对失败弹提示框，有 `确定` 按钮
+  - 修改设备名称弹"修改设备名称"对话框: TextInput（预填当前名称）+ `确定` 按钮 + `来自剪贴板` 选项
 - **关键注意**:
   - 设备名 Text `clickable=false`，需点击父级 Row
   - `find_by_text('配对')` 会匹配到"已配对设备" → 用 `find_button()` 排除含"设备"的长文本
@@ -728,7 +729,7 @@ WiFi 列表项为 `Row` (clickable=true), 内含 WiFi 名称 Text + 状态 Text 
 
 | 子项 | id | 形态 | 状态/操作说明 |
 |------|-----|------|------------|
-| 设备名称 | `version_info_group.display_device_name` | text_value | 右侧如"HuaweiHotspot" |
+| 设备名称 | `version_info_group.display_device_name` | text_value | 标签下方显示如"HuaweiHotspot"。与"存储"同行（双列布局）。蓝牙本机名称的查询/设置通过"星闪和蓝牙"页面操作更便捷 |
 | 型号名称 | `version_info_group.display_device_name` | text_value | 右侧如"HUAWEI Pura X 典藏版" |
 | 型号代码 | `version_info_group.product_model` | text_value | 右侧如"VDE-AL10" |
 | **HarmonyOS 版本** | `version_info_group.harmonyos_version.title/result` | text_value | 右侧如"6.1.0"，**连续点击 7 次开启开发者模式** |

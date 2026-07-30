@@ -17,6 +17,7 @@ categories = [
         ("WLAN下自动下载", "query_wlan_auto_download()\nset_wlan_auto_download('on'/'off')"),
         ("蓝牙开关", "query_bluetooth()\nset_bluetooth('on'/'off')"),
         ("蓝牙设备", "query_bluetooth_device(name)\nconnect_bluetooth(name)\ndisconnect_bluetooth(name)"),
+        ("蓝牙本机名称", "query_bluetooth_name()\nset_bluetooth_name(name)"),
         ("星闪", "query_nearlink()\nset_nearlink('on'/'off')"),
         ("飞行模式", "query_flight_mode()\nset_flight_mode('on'/'off')"),
         ("个人热点", "query_personal_hotspot()\nset_personal_hotspot('on'/'off')"),

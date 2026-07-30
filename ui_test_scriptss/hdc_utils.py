@@ -540,14 +540,20 @@ def set_slider(layout, target_text, value):
 def input_text(x, y, text):
     """
     在指定坐标的文本框中输入文本（长按全选 → 替换输入）
+    如果全选菜单未出现会重试，确保替换而非追加。
     """
-    # 长按显示上下文菜单
-    hdc_shell('uitest', 'uiInput', 'longClick', str(x), str(y))
-    time.sleep(1.5)
-    # 点击"全选"
-    layout = dump_layout()
-    if not click_by_text(layout, '全选', 0.5):
-        # 全选菜单未出现，直接点击输入
+    selected = False
+    for _ in range(3):
+        # 长按显示上下文菜单
+        hdc_shell('uitest', 'uiInput', 'longClick', str(x), str(y))
+        time.sleep(2.0)
+        # 点击"全选"
+        layout = dump_layout()
+        if click_by_text(layout, '全选', 0.5):
+            selected = True
+            break
+    if not selected:
+        # 全选菜单未出现，直接点击输入（可能导致追加，但无法避免）
         click_at(x, y, 0.5)
     # 输入新文本（替换选中的文本）
     hdc_shell('uitest', 'uiInput', 'text', text)

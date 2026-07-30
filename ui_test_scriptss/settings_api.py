@@ -671,6 +671,114 @@ def disconnect_bluetooth(device_name):
     return False, 'connected'
 
 
+def _find_device_name_desc(layout):
+    """在星闪和蓝牙页面查找包含'修改设备名称'的描述文本组件"""
+    comps = find_components(layout, lambda c: '修改设备名称' in (attr(c, 'text', '') or attr(c, 'originalText', '')))
+    return comps[0] if comps else None
+
+
+def _parse_device_name_from_desc(text):
+    """从描述文本中解析设备名称: 可被附近的设备发现为"xxx"，修改设备名称"""
+    import re
+    m = re.search(r'[\u201c\u201d"](.+?)[\u201c\u201d"]', text)
+    return m.group(1) if m else None
+
+
+def _click_modify_name(layout):
+    """
+    在星闪和蓝牙页面点击'修改设备名称'部分以弹出修改对话框。
+    描述文本中的'修改设备名称'是可点击 Span，需点击该区域而非整段文本中心。
+
+    策略: 先按估算位置快速尝试，失败则从文本中部向右扫描直到弹出对话框。
+    这样不依赖精确的字符宽度估算，换设备也能自适应。
+    """
+    comp = _find_device_name_desc(layout)
+    if not comp:
+        return False
+    full_text = get_text(comp)
+    b = parse_full_bounds(attr(comp, 'bounds', ''))
+    if not b:
+        return False
+    cy = (b[1] + b[3]) // 2
+
+    # 快速路径: 估算前缀宽度定位'修改设备名称'起始位置
+    suffix = '修改设备名称'
+    prefix = full_text[:-len(suffix)] if full_text.endswith(suffix) else full_text.rsplit(suffix, 1)[0]
+    char_h = b[3] - b[1]
+    cn = sum(1 for c in prefix if ord(c) > 127)
+    asc = len(prefix) - cn
+    prefix_w = cn * char_h + asc * char_h // 2
+    start_x = b[0] + prefix_w
+    for offset in (40, 20, 60, 0, 80):
+        cx = start_x + offset
+        if b[0] <= cx <= b[2]:
+            click_at(cx, cy, 3.0)
+            layout2 = dump_layout()
+            if layout2 and find_components(layout2, lambda c: attr(c, 'type', '') == 'TextInput'):
+                return True
+
+    # 兜底扫描: 从文本 40% 处向右每 30px 尝试，覆盖整个文本区域
+    scan_start = b[0] + int((b[2] - b[0]) * 0.4)
+    scan_end = b[2]
+    for cx in range(scan_start, scan_end + 1, 30):
+        click_at(cx, cy, 2.0)
+        layout2 = dump_layout()
+        if layout2 and find_components(layout2, lambda c: attr(c, 'type', '') == 'TextInput'):
+            return True
+
+    return False
+
+
+def query_bluetooth_name():
+    """
+    查询蓝牙本机名称（设备名称） → str | None
+
+    设备名称同时用于蓝牙、星闪、热点共享和 USB 连接。
+    从"星闪和蓝牙"页面的描述文本中解析。
+    """
+    layout = navigate_to_page('星闪和蓝牙', 2)
+    if not layout:
+        return None
+    comp = _find_device_name_desc(layout)
+    if not comp:
+        return None
+    return _parse_device_name_from_desc(get_text(comp))
+
+
+def set_bluetooth_name(name):
+    """
+    设置蓝牙本机名称（设备名称） → (success: bool, new_name: str | None)
+
+    在"星闪和蓝牙"页面点击'修改设备名称'弹出对话框（TextInput + 确定按钮）。
+    设备名称同时用于蓝牙、星闪、热点共享和 USB 连接。
+    """
+    layout = navigate_to_page('星闪和蓝牙', 2)
+    if not layout:
+        return False, None
+    if not _click_modify_name(layout):
+        return False, None
+    layout = dump_layout()
+    inputs = find_components(layout, lambda c: attr(c, 'type', '') == 'TextInput')
+    if not inputs:
+        return False, None
+    fb = parse_full_bounds(attr(inputs[0], 'bounds', ''))
+    if not fb:
+        return False, None
+    cx = (fb[0] + fb[2]) // 2
+    cy = (fb[1] + fb[3]) // 2
+    input_text(cx, cy, name)
+    # 点击"确定"
+    layout = dump_layout()
+    click_by_text(layout, '确定', 2.0)
+    # 验证
+    layout = dump_layout()
+    comp = _find_device_name_desc(layout)
+    if not comp:
+        return False, None
+    new_name = _parse_device_name_from_desc(get_text(comp))
+    return (new_name == name), new_name
+
+
 # ── 屏幕亮度 ──
 
 def query_brightness():
