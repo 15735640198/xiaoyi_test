@@ -779,6 +779,159 @@ def set_bluetooth_name(name):
     return (new_name == name), new_name
 
 
+# ── 桌面设置 ──
+
+# 桌面设置功能项配置: enum → (页面文本, 控件形态, 说明)
+_DESKTOP_SETTINGS_MAP = {
+    'swipe_down':  ('桌面下滑', 'toggle_row',     '桌面下滑打开小艺搜索'),
+    'swipe_up':    ('桌面上滑', 'toggle_row',     '桌面上滑打开应用中心'),
+    'layout':      ('桌面布局', 'text_value_raw', '桌面布局模式（标准/紧凑）'),
+    'auto_align':  ('自动对齐', 'toggle_row',     '删除应用后自动补齐空位'),
+    'lock_layout': ('锁定布局', 'toggle_row',     '开启后桌面元素无法移动或移除'),
+}
+# 仅 toggle 项支持 set_desktop_setting
+_DESKTOP_TOGGLE_ITEMS = {k for k, (_, form, _) in _DESKTOP_SETTINGS_MAP.items()
+                         if form == 'toggle_row'}
+
+
+def _navigate_to_desktop_settings():
+    """
+    导航到桌面设置子页面: 设置 > 桌面和个性化 > 桌面设置
+    入口文本在不同设备上可能为"桌面和个性化"或"桌面、外屏和个性化"。
+    返回: 页面 layout 或 None
+    """
+    restart_settings()
+    layout = dump_layout()
+    # 滑动查找桌面入口（兼容不同设备名称）
+    clicked = False
+    for i in range(5):
+        for c in find_components(layout, lambda c: attr(c, 'type', '') == 'Text'):
+            txt = get_text(c)
+            if txt and '桌面' in txt and '个性化' in txt:
+                if click_by_text(layout, txt, 3.0):
+                    clicked = True
+                    break
+        if clicked:
+            break
+        swipe_up(1.5)
+        layout = dump_layout()
+    if not clicked:
+        return None
+    layout = dump_layout()
+    # 滑动查找"桌面设置"并点击
+    for _ in range(4):
+        if click_by_text(layout, '桌面设置', 3.0):
+            return dump_layout()
+        swipe_up(2.0)
+        layout = dump_layout()
+    return None
+
+
+def query_desktop_setting(item):
+    """
+    查询桌面设置功能状态
+
+    支持 5 个枚举:
+        'swipe_down'  桌面下滑 — 桌面下滑打开小艺搜索          → 'on'/'off'
+        'swipe_up'    桌面上滑 — 桌面上滑打开应用中心          → 'on'/'off'
+        'layout'      桌面布局 — 桌面布局模式（标准/紧凑）      → '标准'/'紧凑'
+        'auto_align'  自动对齐 — 删除应用后自动补齐空位        → 'on'/'off'
+        'lock_layout' 锁定布局 — 开启后桌面元素无法移动或移除    → 'on'/'off'
+
+    Returns:
+        'on' | 'off' | 'unknown' | str(布局名) | None(未找到)
+    """
+    if item not in _DESKTOP_SETTINGS_MAP:
+        return None
+    target, form, _desc = _DESKTOP_SETTINGS_MAP[item]
+    layout = _navigate_to_desktop_settings()
+    if not layout:
+        return None
+    if form == 'toggle_row':
+        return read_status_toggle_row(layout, target)
+    elif form == 'text_value':
+        return read_status_text_value(layout, target)
+    else:
+        return read_text_value_raw(layout, target)
+
+
+def set_desktop_setting(item, desired):
+    """
+    设置桌面设置功能开关（仅 toggle 项）
+
+    支持 4 个枚举:
+        'swipe_down'  桌面下滑 — 桌面下滑打开小艺搜索
+        'swipe_up'    桌面上滑 — 桌面上滑打开应用中心
+        'auto_align'  自动对齐 — 删除应用后自动补齐空位
+        'lock_layout' 锁定布局 — 开启后桌面元素无法移动或移除
+
+    注意: 'layout'（桌面布局）不是开关，请用 set_desktop_layout('标准'/'紧凑')
+
+    Returns:
+        (success: bool, new_status: str)
+    """
+    if item not in _DESKTOP_TOGGLE_ITEMS:
+        return False, None
+    target, form, _desc = _DESKTOP_SETTINGS_MAP[item]
+    layout = _navigate_to_desktop_settings()
+    if not layout:
+        return False, None
+    current = read_status_toggle_row(layout, target)
+    if current == desired:
+        return True, current
+    if not toggle_operation(layout, target, 'toggle_row', desired):
+        return False, current
+    time.sleep(1)
+    layout = dump_layout()
+    new_status = read_status_toggle_row(layout, target)
+    return (new_status == desired), new_status
+
+
+def set_desktop_layout(layout_name):
+    """
+    设置桌面布局模式 → (success: bool, new_layout: str)
+
+    Args:
+        layout_name: '标准' 或 '紧凑'
+
+    桌面布局子页面: 标准（卡片和图标展示均衡）/ 紧凑（卡片缩小，展示更多图标）
+    """
+    if layout_name not in ('标准', '紧凑'):
+        return False, None
+    layout = _navigate_to_desktop_settings()
+    if not layout:
+        return False, None
+    # 当前已是目标布局
+    current = read_text_value_raw(layout, '桌面布局')
+    if current is None:
+        time.sleep(2)
+        layout = dump_layout()
+        current = read_text_value_raw(layout, '桌面布局')
+    if current == layout_name:
+        return True, current
+    # 点击"桌面布局"进入选择页
+    if not click_by_text(layout, '桌面布局', 3.0):
+        return False, current
+    layout = dump_layout()
+    # 点击目标选项（Radio 旁边的文本）
+    if not click_by_text(layout, layout_name, 2.0):
+        return False, current
+    # 点击"应用"
+    layout = dump_layout()
+    btn = find_button(layout, '应用')
+    if btn:
+        bc = parse_bounds(attr(btn[0], 'bounds', ''))
+        if bc:
+            click_at(bc[0], bc[1], 3.0)
+    # 验证：重新导航到桌面设置页读取
+    time.sleep(2)
+    layout = _navigate_to_desktop_settings()
+    if not layout:
+        return False, None
+    new_layout = read_text_value_raw(layout, '桌面布局')
+    return (new_layout == layout_name), new_layout
+
+
 # ── 屏幕亮度 ──
 
 def query_brightness():

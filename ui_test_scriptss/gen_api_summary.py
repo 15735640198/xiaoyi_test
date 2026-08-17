@@ -43,6 +43,9 @@ categories = [
         ("字体粗细", "query_font_weight()\nset_font_weight('最细'/'标准'/'最粗')"),
         ("电子书模式", "query_ebook_mode()"),
     ]),
+    ("桌面设置", [
+        ("桌面设置(下滑/上滑/布局/自动对齐/锁定布局)", "query_desktop_setting(item)\nset_desktop_setting(item, 'on'/'off')\nset_desktop_layout('标准'/'紧凑')\n  item: swipe_down/swipe_up/layout/auto_align/lock_layout"),
+    ]),
     ("声音", [
         ("朗读速度", "query_speech_rate()\nset_speech_rate(value)"),
         ("来电铃声", "query_ringtone()\nset_ringtone_default()"),

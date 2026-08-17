@@ -118,6 +118,15 @@ def set_zoom_gesture(desired):
 | 字体粗细 | `query_font_weight()` | `set_font_weight('最细'/'标准'/'最粗')` |
 | 电子书模式 | `query_ebook_mode()` | — |
 
+**桌面设置**
+
+| 设置项 | 查询函数 | 开关函数 |
+|--------|---------|---------|
+| 桌面设置(全部) | `query_desktop_setting(item)` | `set_desktop_setting(item, 'on'/'off')` |
+
+> `item` 枚举: `swipe_down`(桌面下滑) / `swipe_up`(桌面上滑) / `layout`(桌面布局) / `auto_align`(自动对齐) / `lock_layout`(锁定布局)
+> set 方法仅对 toggle 项有效（swipe_down/swipe_up/auto_align/lock_layout），layout 用 `set_desktop_layout('标准'/'紧凑')` 单独设置
+
 **声音**
 
 | 设置项 | 查询函数 | 开关函数 |
@@ -275,6 +284,7 @@ ui_test_scriptss/
 ├── developer_mode_manager.py       开发者模式查询与开关（点击版本号7次/关闭总开关）
 ├── fingerprint_manager.py          指纹录入状态查询
 ├── privacy_space_manager.py        隐私空间状态查询
+├── desktop_settings_manager.py    桌面设置查询(下滑/上滑/布局/自动对齐/负一屏/锁定布局)
 ├── query_current_page.py           查询当前设置页面标题
 ├── app_network_manager.py          应用联网查询与设置(移动数据/WLAN)
 ├── app_data_usage_manager.py       应用流量使用量查询(30天/24小时)
