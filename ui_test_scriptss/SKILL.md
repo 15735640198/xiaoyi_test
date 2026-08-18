@@ -123,9 +123,13 @@ def set_zoom_gesture(desired):
 | 设置项 | 查询函数 | 开关函数 |
 |--------|---------|---------|
 | 桌面设置(全部) | `query_desktop_setting(item)` | `set_desktop_setting(item, 'on'/'off')` |
+| 桌面布局 | — | `set_desktop_layout('标准'/'紧凑')` |
+| 主题是否可见 | `is_theme_visible(theme_name)` → bool | — |
+| 主题详情页校验 | `is_theme_detail(theme_name)` → bool | — |
 
 > `item` 枚举: `swipe_down`(桌面下滑) / `swipe_up`(桌面上滑) / `layout`(桌面布局) / `auto_align`(自动对齐) / `lock_layout`(锁定布局)
-> set 方法仅对 toggle 项有效（swipe_down/swipe_up/auto_align/lock_layout），layout 用 `set_desktop_layout('标准'/'紧凑')` 单独设置
+> set_desktop_setting 仅对 toggle 项有效（swipe_down/swipe_up/auto_align/lock_layout），layout 用 set_desktop_layout 单独设置
+> is_theme_visible / is_theme_detail 不导航，只检查当前页面，需调用方先导航到目标页面
 
 **声音**
 

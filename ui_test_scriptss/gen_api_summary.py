@@ -45,6 +45,7 @@ categories = [
     ]),
     ("桌面设置", [
         ("桌面设置(下滑/上滑/布局/自动对齐/锁定布局)", "query_desktop_setting(item)\nset_desktop_setting(item, 'on'/'off')\nset_desktop_layout('标准'/'紧凑')\n  item: swipe_down/swipe_up/layout/auto_align/lock_layout"),
+        ("桌面主题", "is_theme_visible(theme_name) → bool\nis_theme_detail(theme_name) → bool\n  不导航，只检查当前页面\n  如 星蕴金/星蕴蓝/织锦金/元气心情"),
     ]),
     ("声音", [
         ("朗读速度", "query_speech_rate()\nset_speech_rate(value)"),

@@ -5,6 +5,8 @@ HarmonyOS 桌面设置脚本（CLI 调度器）
 API: settings_api.query_desktop_setting(item)
      settings_api.set_desktop_setting(item, desired)
      settings_api.set_desktop_layout(layout_name)
+     settings_api.is_theme_visible(theme_name)
+     settings_api.is_theme_detail(theme_name)
 
 用法:
   python desktop_settings_manager.py                     # 查询全部
@@ -12,11 +14,16 @@ API: settings_api.query_desktop_setting(item)
   python desktop_settings_manager.py --item swipe_down --action on    # 开启
   python desktop_settings_manager.py --item swipe_down --action off   # 关闭
   python desktop_settings_manager.py --set-layout 标准   # 设置桌面布局
+  python desktop_settings_manager.py --theme-visible 星环    # 检查主题是否可见
+  python desktop_settings_manager.py --theme-detail 元气心情  # 校验当前是否为该主题详情页
 """
 
 import argparse
 from hdc_utils import find_hdc, check_device
-from settings_api import query_desktop_setting, set_desktop_setting, set_desktop_layout
+from settings_api import (
+    query_desktop_setting, set_desktop_setting, set_desktop_layout,
+    is_theme_visible, is_theme_detail,
+)
 
 ITEMS = [
     ('swipe_down',  '桌面下滑', '桌面下滑打开小艺搜索'),
@@ -40,6 +47,10 @@ def main():
     parser.add_argument('--set-layout', default=None,
                         choices=['标准', '紧凑'],
                         help='设置桌面布局模式')
+    parser.add_argument('--theme-visible', default=None,
+                        help='检查主题是否在当前页面可见（如 星环）')
+    parser.add_argument('--theme-detail', default=None,
+                        help='校验当前是否为该主题的详情页（如 元气心情）')
     args = parser.parse_args()
 
     print("=" * 50)
@@ -57,6 +68,17 @@ def main():
             print(f"  >>> 桌面布局已设置为: {new_layout} <<<\n")
         else:
             print(f"  >>> 设置失败，当前布局: {new_layout} <<<\n")
+        return
+
+    # 主题检查
+    if args.theme_visible:
+        visible = is_theme_visible(args.theme_visible)
+        print(f"  >>> 主题 '{args.theme_visible}' {'可见' if visible else '不可见'} <<<\n")
+        return
+
+    if args.theme_detail:
+        result = is_theme_detail(args.theme_detail)
+        print(f"  >>> 当前{'是' if result else '不是'} '{args.theme_detail}' 主题详情页 <<<\n")
         return
 
     # 设置开关模式

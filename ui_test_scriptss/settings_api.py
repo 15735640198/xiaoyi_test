@@ -932,6 +932,63 @@ def set_desktop_layout(layout_name):
     return (new_layout == layout_name), new_layout
 
 
+# ── 主题 ──
+
+def is_theme_visible(theme_name):
+    """
+    检查当前主题列表页中是否可见指定主题 → bool
+
+    Args:
+        theme_name: 主题名称（如 '星环'、'织锦金'、'元气心情'）
+
+    不导航、不滑动，只检查当前页面。需调用方先导航到更多主题页面。
+    """
+    layout = dump_layout()
+    if not layout:
+        return False
+    # 确认在设置App中
+    if not find_components(layout, lambda c: 'settings' in attr(c, 'bundleName', '')):
+        return False
+    # 确认在主题列表页（预览卡片的 description 为"单指双击即可执行"）
+    cards = find_components(layout, lambda c:
+        attr(c, 'clickable', '') == 'true' and
+        attr(c, 'type', '') == 'Stack' and
+        attr(c, 'description', '') == '单指双击即可执行')
+    if not cards:
+        return False
+    # 在当前可视区域查找主题名（originalText 精确匹配）
+    for c in find_components(layout, lambda c: True):
+        if attr(c, 'type', '') == 'Text' and attr(c, 'originalText', '') == theme_name:
+            return True
+    return False
+
+
+def is_theme_detail(theme_name):
+    """
+    校验当前页面是否为指定主题的详情页 → bool
+
+    Args:
+        theme_name: 主题名称（如 '元气心情'、'织锦金'、'萌主跳跳'）
+
+    不导航，只检查当前页面。需调用方先导航到目标主题的详情页。
+    判断依据: 页面同时包含主题名 + "内容简介" + 应用按钮(应用/继续/去应用/当前主题)。
+    """
+    layout = dump_layout()
+    if not layout:
+        return False
+    # 收集页面所有文本
+    all_texts = set()
+    for c in find_components(layout, lambda c: True):
+        txt = attr(c, 'text', '') or attr(c, 'originalText', '')
+        if txt:
+            all_texts.add(txt)
+    # 三个特征同时满足
+    has_name = theme_name in all_texts
+    has_intro = '内容简介' in all_texts
+    has_button = all_texts & {'应用', '继续', '去应用', '当前主题'}
+    return has_name and has_intro and bool(has_button)
+
+
 # ── 屏幕亮度 ──
 
 def query_brightness():
